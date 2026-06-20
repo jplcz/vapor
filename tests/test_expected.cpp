@@ -109,7 +109,7 @@ TEST(ExpectedTest, CopyAndMoveSemantics)
 
 TEST(ExpectedTest, STLInteroperability)
 {
-#if defined(VAPOR_USE_STL) && (__cplusplus >= 202302L)
+#if defined(VAPOR_HAS_STD_EXPECTED)
     // Convert std::expected -> vapor::Expected
     std::expected<int, int> std_exp = 777;
     vapor::Expected<int, int> vapor_exp(std_exp);
