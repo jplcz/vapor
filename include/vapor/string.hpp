@@ -220,25 +220,25 @@ public:
   VAPOR_NODISCARD size_type size() const noexcept { return m_length; }
   VAPOR_NODISCARD size_type capacity() const noexcept { return m_capacity; }
   VAPOR_NODISCARD bool empty() const noexcept { return m_length == 0; }
-  VAPOR_NODISCARD const_pointer c_str() const noexcept {
+  VAPOR_NODISCARD const_pointer c_str() const & noexcept {
     return m_data ? m_data : "";
   }
-  VAPOR_NODISCARD const_pointer data() const noexcept {
+  VAPOR_NODISCARD const_pointer data() const & noexcept {
     return m_data ? m_data : "";
   }
-  VAPOR_NODISCARD Expected<pointer, StringError> try_data() noexcept {
-    if (!m_data)
+  VAPOR_NODISCARD Expected<pointer, StringError> try_data() & noexcept {
+    if (!m_data || m_length == 0)
       return MakeUnexpected(StringError::EmptyString);
     return m_data;
   }
 
-  VAPOR_NODISCARD operator StringView() const noexcept {
+  VAPOR_NODISCARD operator StringView() const & noexcept {
     return StringView(data(), size());
   }
 
   VAPOR_NODISCARD
   VAPOR_CXX20_CONSTEXPR Expected<ReferenceWrapper<char>, StringError>
-  checked_at(size_type pos) noexcept {
+  checked_at(size_type pos) & noexcept {
     if (pos >= m_length)
       return MakeUnexpected(StringError::OutOfBounds);
     return ReferenceWrapper<char>(m_data[pos]);
@@ -246,7 +246,7 @@ public:
 
   VAPOR_NODISCARD
   VAPOR_CXX20_CONSTEXPR Expected<ReferenceWrapper<const char>, StringError>
-  checked_at(size_type pos) const noexcept {
+  checked_at(size_type pos) const & noexcept {
     if (pos >= m_length)
       return MakeUnexpected(StringError::OutOfBounds);
     return ReferenceWrapper<const char>(m_data[pos]);
