@@ -19,6 +19,8 @@ public:
 
   // Arrow operator to transparently access members if T is a struct/class
   VAPOR_CXX14_CONSTEXPR T *operator->() const noexcept { return m_ptr; }
+
+  VAPOR_CXX14_CONSTEXPR T &operator*() const noexcept { return *m_ptr; }
 };
 
 } // namespace vapor

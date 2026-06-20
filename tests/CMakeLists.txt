@@ -19,7 +19,8 @@ foreach (STD ${CPP_STANDARDS})
         add_executable(${TEST_TARGET} main_test.cpp
                 test_expected.cpp
                 test_string_view.cpp
-                test_span.cpp)
+                test_span.cpp
+                test_string.cpp)
 
         target_compile_features(${TEST_TARGET} PRIVATE cxx_std_${STD})
 

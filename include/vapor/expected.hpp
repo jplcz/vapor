@@ -46,6 +46,8 @@ private:
 
 public:
   // --- Standard Constructors ---
+  VAPOR_CXX14_CONSTEXPR Expected() : m_has_value(true) { new (&m_value) T(); }
+
   VAPOR_CXX14_CONSTEXPR Expected(const T &val) : m_has_value(true) {
     new (&m_value) T(val);
   }
@@ -194,4 +196,130 @@ public:
     return m_has_value ? m_value : static_cast<T>((default_value));
   }
 };
+
+template <typename E> class VAPOR_NODISCARD Expected<void, E> {
+private:
+  struct empty {};
+
+  union {
+    empty m_no_value;
+    E m_error;
+  };
+  bool m_has_value;
+
+  void destroy() noexcept {
+    if (!m_has_value) {
+      m_error.~E();
+    }
+  }
+
+public:
+  // Default constructor indicates a generic "success" state
+  VAPOR_CXX14_CONSTEXPR Expected() noexcept : m_has_value(true) {
+    new (&m_no_value) empty();
+  }
+
+  VAPOR_CXX14_CONSTEXPR Expected(const Unexpected<E> &unex)
+      : m_has_value(false) {
+    new (&m_error) E(unex.error);
+  }
+
+  VAPOR_CXX14_CONSTEXPR Expected(Unexpected<E> &&unex) : m_has_value(false) {
+    new (&m_error) E(static_cast<E &&>(unex.error));
+  }
+
+  // --- Copy & Move Lifecycles ---
+
+  VAPOR_CXX14_CONSTEXPR Expected(const Expected &other)
+      : m_has_value(other.m_has_value) {
+    if (!m_has_value) {
+      new (&m_error) E(other.m_error);
+    }
+  }
+
+  VAPOR_CXX14_CONSTEXPR Expected(Expected &&other) noexcept
+      : m_has_value(other.m_has_value) {
+    if (!m_has_value) {
+      new (&m_error) E(static_cast<E &&>(other.m_error));
+    }
+  }
+
+  Expected &operator=(const Expected &other) {
+    if (this != &other) {
+      destroy();
+      m_has_value = other.m_has_value;
+      if (!m_has_value) {
+        new (&m_error) E(other.m_error);
+      }
+    }
+    return *this;
+  }
+
+  Expected &operator=(Expected &&other) noexcept {
+    if (this != &other) {
+      destroy();
+      m_has_value = other.m_has_value;
+      if (!m_has_value) {
+        new (&m_error) E(static_cast<E &&>(other.m_error));
+      }
+    }
+    return *this;
+  }
+
+  VAPOR_CXX20_CONSTEXPR ~Expected() { destroy(); }
+
+  // --- std::expected<void, E> Interoperability ---
+#if defined(VAPOR_HAS_STD_EXPECTED)
+  VAPOR_CXX14_CONSTEXPR Expected(const std::expected<void, E> &other)
+      : m_has_value(other.has_value()) {
+    if (!m_has_value) {
+      new (&m_error) E(other.error());
+    }
+  }
+
+  VAPOR_CXX14_CONSTEXPR Expected(std::expected<void, E> &&other)
+      : m_has_value(other.has_value()) {
+    if (!m_has_value) {
+      new (&m_error) E(static_cast<E &&>(other.error()));
+    }
+  }
+
+  VAPOR_NODISCARD VAPOR_CXX14_CONSTEXPR
+  operator std::expected<void, E>() const & {
+    if (m_has_value)
+      return {};
+    return std::unexpected<E>(m_error);
+  }
+
+  VAPOR_NODISCARD VAPOR_CXX14_CONSTEXPR operator std::expected<void, E>() && {
+    if (m_has_value)
+      return {};
+    return std::unexpected<E>(static_cast<E &&>(m_error));
+  }
+#endif
+
+  // --- Accessors ---
+
+  VAPOR_NODISCARD VAPOR_CXX14_CONSTEXPR bool has_value() const noexcept {
+    return m_has_value;
+  }
+  VAPOR_NODISCARD VAPOR_CXX14_CONSTEXPR explicit
+  operator bool() const noexcept {
+    return m_has_value;
+  }
+
+  // value() returns void, primarily checking assertions
+  VAPOR_CXX14_CONSTEXPR void value() const { assert(m_has_value); }
+
+  VAPOR_NODISCARD VAPOR_CXX14_CONSTEXPR const E &error() const & {
+    assert(!m_has_value);
+    return m_error;
+  }
+
+  VAPOR_NODISCARD VAPOR_CXX14_CONSTEXPR E &error() & {
+    assert(!m_has_value);
+    return m_error;
+  }
+};
+
 } // namespace vapor
