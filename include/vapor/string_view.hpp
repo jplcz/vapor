@@ -1,6 +1,8 @@
 #pragma once
 #include <assert.h>
+#include <limits.h>
 #include <stddef.h>
+#include <string.h>
 #include <vapor/common.hpp>
 #include <vapor/expected.hpp>
 #include <vapor/reference_wrapper.hpp>
@@ -25,7 +27,7 @@ struct VAPOR_NODISCARD StringView {
   typedef size_t size_type;
   typedef ptrdiff_t difference_type;
   typedef const char *const_iterator;
-  static VAPOR_CXX14_CONSTEXPR size_type npos = size_type(-1);
+  static VAPOR_CXX14_CONSTEXPR inline size_type npos = size_type(-1);
 
   const char *m_string;
   size_t m_length;
