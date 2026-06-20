@@ -23,3 +23,15 @@
 #else
     #define VAPOR_CXX14_CONSTEXPR
 #endif
+
+#if __cplusplus >= 201703L
+    #define VAPOR_CXX17_CONSTEXPR constexpr
+#else
+    #define VAPOR_CXX17_CONSTEXPR
+#endif
+
+#if __cplusplus >= 202002L
+    #define VAPOR_CXX20_CONSTEXPR constexpr
+#else
+    #define VAPOR_CXX20_CONSTEXPR
+#endif

@@ -2,6 +2,8 @@
 #include <assert.h>
 #include <stddef.h>
 #include <vapor/common.hpp>
+#include <vapor/expected.hpp>
+#include <vapor/reference_wrapper.hpp>
 
 #if defined(VAPOR_USE_STL) && (__cplusplus >= 202002L)
 #if defined(__has_include)
@@ -16,6 +18,8 @@
 #endif
 
 namespace vapor {
+
+enum class SpanError { OutOfBounds, EmptySpan };
 
 template <typename T> class VAPOR_NODISCARD Span {
 public:
@@ -167,6 +171,60 @@ public:
 
   VAPOR_NODISCARD bool operator!=(const Span &rhs) const noexcept {
     return !(*this == rhs);
+  }
+
+  // --- Checked Element Access ---
+
+  VAPOR_NODISCARD VAPOR_CXX20_CONSTEXPR Expected<ReferenceWrapper<T>, SpanError>
+  checked_at(size_type pos) const noexcept {
+    if (pos >= m_length) {
+      return MakeUnexpected(SpanError::OutOfBounds);
+    }
+    return ReferenceWrapper<T>(m_data[pos]);
+  }
+
+  VAPOR_NODISCARD VAPOR_CXX20_CONSTEXPR Expected<ReferenceWrapper<T>, SpanError>
+  checked_front() const noexcept {
+    if (empty()) {
+      return MakeUnexpected(SpanError::EmptySpan);
+    }
+    return ReferenceWrapper<T>(*m_data);
+  }
+
+  VAPOR_NODISCARD VAPOR_CXX20_CONSTEXPR Expected<ReferenceWrapper<T>, SpanError>
+  checked_back() const noexcept {
+    if (empty()) {
+      return MakeUnexpected(SpanError::EmptySpan);
+    }
+    return ReferenceWrapper<T>(*(m_data + m_length - 1));
+  }
+
+  // --- Checked Subviews ---
+
+  VAPOR_NODISCARD VAPOR_CXX20_CONSTEXPR Expected<Span, SpanError>
+  checked_subspan(size_type pos, size_type count = npos) const noexcept {
+    if (pos > m_length) {
+      return MakeUnexpected(SpanError::OutOfBounds);
+    }
+
+    size_type rcount = (count < m_length - pos) ? count : (m_length - pos);
+    return Span(m_data + pos, rcount);
+  }
+
+  VAPOR_NODISCARD VAPOR_CXX20_CONSTEXPR Expected<Span, SpanError>
+  checked_first(size_type count) const noexcept {
+    if (count > m_length) {
+      return MakeUnexpected(SpanError::OutOfBounds);
+    }
+    return Span(m_data, count);
+  }
+
+  VAPOR_NODISCARD VAPOR_CXX20_CONSTEXPR Expected<Span, SpanError>
+  checked_last(size_type count) const noexcept {
+    if (count > m_length) {
+      return MakeUnexpected(SpanError::OutOfBounds);
+    }
+    return Span(m_data + (m_length - count), count);
   }
 };
 
