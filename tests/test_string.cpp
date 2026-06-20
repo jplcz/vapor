@@ -204,3 +204,31 @@ TEST(StringTest, TryDataHandling) {
   (*success_res)[0] = 'v';
   EXPECT_STREQ(populated_str.c_str(), "vapor");
 }
+
+TEST(StringTest, RvalueCloneOptimization) {
+  vapor::String temporary_str;
+  ASSERT_TRUE(
+      temporary_str.append(vapor::StringView("RvaluePayload")).has_value());
+
+  // Cache the original underlying raw buffer pointer address
+  const char *original_buffer_address = temporary_str.data();
+  size_t original_size = temporary_str.size();
+
+  // Force invocation of the 'const &&' Clone() specialization via std::move
+  auto clone_res = std::move(temporary_str).Clone();
+  ASSERT_TRUE(clone_res.has_value());
+
+  vapor::String final_str = std::move(*clone_res);
+
+  // Verify the data transitioned perfectly
+  EXPECT_STREQ(final_str.c_str(), "RvaluePayload");
+  EXPECT_EQ(final_str.size(), original_size);
+
+  // Verify it reused the exact same memory address (Zero Allocation!)
+  EXPECT_EQ(final_str.data(), original_buffer_address);
+
+  // Verify the temporary source was safely gutted/moved from by the
+  // implementation
+  EXPECT_TRUE(temporary_str.empty());
+  EXPECT_EQ(temporary_str.capacity(), 0U);
+}

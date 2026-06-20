@@ -121,7 +121,7 @@ public:
   String &operator=(const String &) = delete;
 
   // Deep copy factory method that returns an Expected wrapper
-  Expected<String, StringError> Clone() const noexcept {
+  Expected<String, StringError> Clone() const & noexcept {
     String copy(*m_allocator);
     if (m_length > 0) {
       auto res = copy.reserve(m_capacity);
@@ -135,6 +135,12 @@ public:
       copy.m_data[m_length] = '\0';
     }
     return copy;
+  }
+
+  VAPOR_NODISCARD Expected<String, StringError> Clone() const && noexcept {
+    // The object is a temporary! Instead of deep copying,
+    // we can cheaply cast ourselves to a mutable rvalue and move our data out.
+    return String(std::move(*const_cast<String *>(this)));
   }
 
   Expected<void, StringError> reserve(size_type new_capacity) noexcept {
