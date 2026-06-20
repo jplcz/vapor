@@ -110,7 +110,7 @@ struct VAPOR_NODISCARD StringView {
     return m_length;
   }
   VAPOR_NODISCARD VAPOR_CXX14_CONSTEXPR size_type max_size() const noexcept {
-    return SIZE_T_MAX;
+    return VAPOR_SIZE_MAX;
   }
   VAPOR_NODISCARD VAPOR_CXX14_CONSTEXPR bool empty() const noexcept {
     return m_length == 0;
