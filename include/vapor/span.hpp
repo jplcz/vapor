@@ -170,4 +170,45 @@ public:
   }
 };
 
+#if __cplusplus >= 201703L
+
+// Deduce type from a raw pointer and size count
+template <typename T> Span(T *ptr, size_t count) -> Span<T>;
+
+// Deduce type from an iterator range (first, last)
+template <typename T> Span(T *first, T *last) -> Span<T>;
+
+// Deduce type and size automatically from a native C-style array reference
+template <typename T, size_t N> Span(T (&arr)[N]) -> Span<T>;
+
+#endif
+
 } // namespace vapor
+
+#if defined(VAPOR_USE_STL)
+#include <functional>
+#include <string_view>
+
+namespace std {
+template <typename T> struct hash<vapor::Span<T>> {
+  VAPOR_NODISCARD size_t operator()(const vapor::Span<T> &s) const noexcept {
+#if __cplusplus >= 201703L
+    // If T is a trivially copyable type (like int, float, char),
+    // we can treat the entire span as a raw string of bytes and recycle
+    // std::string_view's hash!
+    if (std::is_trivially_copyable<T>::value) {
+      return std::hash<std::string_view>{}(std::string_view(
+          reinterpret_cast<const char *>(s.data()), s.size_bytes()));
+    }
+#endif
+    // Fallback element-by-element combination for complex structs or C++11/14
+    size_t seed = s.size();
+    std::hash<T> hasher;
+    for (size_t i = 0; i < s.size(); ++i) {
+      seed ^= hasher(s[i]) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+    }
+    return seed;
+  }
+};
+} // namespace std
+#endif

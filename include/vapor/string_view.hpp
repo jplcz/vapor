@@ -213,3 +213,33 @@ struct VAPOR_NODISCARD StringView {
   }
 };
 } // namespace vapor
+
+#if defined(VAPOR_USE_STL)
+#include <functional>
+#include <string>
+
+#if __cplusplus >= 201703L
+#include <string_view>
+#endif
+
+namespace std {
+template <> struct hash<vapor::StringView> {
+  VAPOR_NODISCARD size_t
+  operator()(const vapor::StringView &sv) const noexcept {
+#if __cplusplus >= 201703L
+    // C++17+: Recycle the native std::string_view hash directly
+    return std::hash<std::string_view>{}(
+        std::string_view(sv.data(), sv.size()));
+#else
+    // C++11/C++14: Fallback to construction allocation hash or simple seed
+    // If allocations are absolutely forbidden even in STL mode, use a basic
+    // hash_combine. For simplicity, we can reuse std::hash for pointers and
+    // sizes:
+    size_t h1 = std::hash<const char *>{}(sv.data());
+    size_t h2 = std::hash<size_t>{}(sv.size());
+    return h1 ^ (h2 + 0x9e3779b9 + (h1 << 6) + (h1 >> 2));
+#endif
+  }
+};
+} // namespace std
+#endif
