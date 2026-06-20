@@ -28,7 +28,7 @@ foreach (STD ${CPP_STANDARDS})
                 gtest_main
         )
 
-        gtest_discover_tests(${TEST_TARGET})
+        gtest_discover_tests(${TEST_TARGET} TEST_PREFIX "cpp${STD}.")
     else ()
         message(STATUS "Skipping C++${STD} test suite: Compiler latest support is C++${CMAKE_CXX_STANDARD_LATEST}")
     endif ()
