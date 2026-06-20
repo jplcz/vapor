@@ -178,10 +178,17 @@ TEST(StringTest, RelationalOperatorsValidation) {
 
 TEST(StringTest, TryDataHandling) {
   vapor::String empty_str;
-  auto fail_res = empty_str.try_data();
+  auto fail_res1 = empty_str.try_data();
+  EXPECT_FALSE(fail_res1.has_value());
+  EXPECT_EQ(fail_res1.error(), vapor::StringError::EmptyString);
 
-  EXPECT_FALSE(fail_res.has_value());
-  EXPECT_EQ(fail_res.error(), vapor::StringError::EmptyString);
+  vapor::String cleared_str;
+  ASSERT_TRUE(cleared_str.append(vapor::StringView("Buffer")).has_value());
+  cleared_str.clear(); // m_data is still allocated, but m_length is 0
+
+  auto fail_res2 = cleared_str.try_data();
+  EXPECT_FALSE(fail_res2.has_value());
+  EXPECT_EQ(fail_res2.error(), vapor::StringError::EmptyString);
 
   vapor::String populated_str;
   ASSERT_TRUE(populated_str.append(vapor::StringView("Vapor")).has_value());
