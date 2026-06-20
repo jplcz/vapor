@@ -33,7 +33,7 @@ public:
   typedef T *iterator;
   typedef const T *const_iterator;
 
-  static VAPOR_CXX14_CONSTEXPR size_type npos = size_type(-1);
+  static VAPOR_CXX14_CONSTEXPR inline size_type npos = size_type(-1);
 
 private:
   pointer m_data;
