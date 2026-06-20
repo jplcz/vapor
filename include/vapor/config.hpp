@@ -45,3 +45,21 @@
 #define VAPOR_SIZE_MAX (~(size_t)0)
 #endif
 #endif
+
+#if !defined(VAPOR_OVERRIDE_FEATURES)
+#if defined(__cplusplus) && (__cplusplus >= 202002L)
+// If the user compiles with -std=c++20 or higher, default to Concepts
+#define VAPOR_USE_CONCEPTS 1
+#elif defined(__cplusplus) && (__cplusplus >= 201103L)
+// If compiling with C++11/C++14/C++17, default to Type Traits
+#define VAPOR_USE_TYPE_TRAITS 1
+#endif
+#endif
+
+#if defined(_MSC_VER) // Microsoft Visual Studio Compiler
+#define VAPOR_ALWAYS_INLINE __forceinline
+#elif defined(__GNUC__) || defined(__clang__) // GCC and Clang Engines
+#define VAPOR_ALWAYS_INLINE inline __attribute__((always_inline))
+#else
+#define VAPOR_ALWAYS_INLINE inline // Fallback rule for generic compilers
+#endif

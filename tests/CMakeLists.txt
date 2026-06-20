@@ -20,7 +20,8 @@ foreach (STD ${CPP_STANDARDS})
                 test_expected.cpp
                 test_string_view.cpp
                 test_span.cpp
-                test_string.cpp)
+                test_string.cpp
+                test_vector.cpp)
 
         target_compile_features(${TEST_TARGET} PRIVATE cxx_std_${STD})
 

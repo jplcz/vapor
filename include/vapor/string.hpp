@@ -5,6 +5,7 @@
 #include <vapor/common.hpp>
 #include <vapor/expected.hpp>
 #include <vapor/string_view.hpp>
+#include <vapor/traits.hpp>
 
 #if defined(VAPOR_USE_STL)
 #include <string>
@@ -408,6 +409,10 @@ VAPOR_NODISCARD inline bool operator>=(const char *lhs,
                                        const String &rhs) noexcept {
   return !(lhs < rhs);
 }
+
+template <> struct IsCloneable<String> {
+  static const bool value = true;
+};
 
 } // namespace vapor
 
