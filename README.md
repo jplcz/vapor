@@ -12,7 +12,7 @@ bare-metal development, or ultra-low-latency game engines).
 * **Modern STL Interoperability:** Automatically provides zero-overhead conversion constructors and operators to 
   native standard types (`std::string_view`, `std::span`, `std::expected`) when compiled in modern C++ environments.
 * **Priority Overrides:** Gives your compiler definitions final say over CMake options via robust conditional preprocessing.
-* 
+
 ## Integration
 
 ### 1. Modern CMake (Recommended via FetchContent)

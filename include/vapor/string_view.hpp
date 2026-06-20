@@ -2,6 +2,8 @@
 #include <assert.h>
 #include <stddef.h>
 #include <vapor/common.hpp>
+#include <vapor/expected.hpp>
+#include <vapor/reference_wrapper.hpp>
 
 #if defined(VAPOR_USE_STL)
 #include <string>
@@ -11,6 +13,8 @@
 #endif
 
 namespace vapor {
+
+enum class StringViewError { OutOfBounds, EmptyView, ValueNotFound };
 
 struct VAPOR_NODISCARD StringView {
   typedef char value_type;
@@ -210,6 +214,107 @@ struct VAPOR_NODISCARD StringView {
 
   VAPOR_NODISCARD VAPOR_CXX14_CONSTEXPR bool ends_with(char c) const noexcept {
     return !empty() && back() == c;
+  }
+
+  // --- Checked Character Queries ---
+
+  VAPOR_NODISCARD VAPOR_CXX20_CONSTEXPR Expected<size_type, StringViewError>
+  checked_find(char c, size_type pos = 0) const noexcept {
+    if (pos >= m_length) {
+      return MakeUnexpected(StringViewError::OutOfBounds);
+    }
+    for (size_type i = pos; i < m_length; ++i) {
+      if (m_string[i] == c)
+        return i;
+    }
+    return MakeUnexpected(StringViewError::ValueNotFound);
+  }
+
+  VAPOR_NODISCARD VAPOR_CXX20_CONSTEXPR Expected<size_type, StringViewError>
+  checked_find(StringView sv, size_type pos = 0) const noexcept {
+    if (pos + sv.size() > m_length) {
+      return MakeUnexpected(StringViewError::OutOfBounds);
+    }
+    if (sv.empty())
+      return pos;
+
+    for (size_type i = pos; i <= m_length - sv.size(); ++i) {
+      bool match = true;
+      for (size_type j = 0; j < sv.size(); ++j) {
+        if (m_string[i + j] != sv[j]) {
+          match = false;
+          break;
+        }
+      }
+      if (match)
+        return i;
+    }
+    return MakeUnexpected(StringViewError::ValueNotFound);
+  }
+
+  // --- Checked Element Access ---
+
+  VAPOR_NODISCARD VAPOR_CXX20_CONSTEXPR
+      Expected<ReferenceWrapper<const char>, StringViewError>
+      checked_at(size_type pos) const noexcept {
+    if (pos >= m_length) {
+      return MakeUnexpected(StringViewError::OutOfBounds);
+    }
+    // Automatically wraps the reference seamlessly
+    return ReferenceWrapper<const char>(m_string[pos]);
+  }
+
+  VAPOR_NODISCARD VAPOR_CXX20_CONSTEXPR
+      Expected<ReferenceWrapper<const char>, StringViewError>
+      checked_front() const noexcept {
+    if (empty()) {
+      return MakeUnexpected(StringViewError::EmptyView);
+    }
+    return ReferenceWrapper<const char>(*m_string);
+  }
+
+  VAPOR_NODISCARD VAPOR_CXX20_CONSTEXPR
+      Expected<ReferenceWrapper<const char>, StringViewError>
+      checked_back() const noexcept {
+    if (empty()) {
+      return MakeUnexpected(StringViewError::EmptyView);
+    }
+    return ReferenceWrapper<const char>(*(m_string + m_length - 1));
+  }
+
+  // --- Checked Trimming & Slicing ---
+
+  VAPOR_NODISCARD VAPOR_CXX20_CONSTEXPR Expected<StringView, StringViewError>
+  checked_remove_prefix(size_type n) const noexcept {
+    if (n > m_length) {
+      return MakeUnexpected(StringViewError::OutOfBounds);
+    }
+    return StringView(m_string + n, m_length - n);
+  }
+
+  VAPOR_NODISCARD VAPOR_CXX20_CONSTEXPR Expected<StringView, StringViewError>
+  checked_remove_suffix(size_type n) const noexcept {
+    if (n > m_length) {
+      return MakeUnexpected(StringViewError::OutOfBounds);
+    }
+    return StringView(m_string, m_length - n);
+  }
+
+  // --- Checked Tokenization / Splitting ---
+
+  VAPOR_NODISCARD VAPOR_CXX20_CONSTEXPR Expected<StringView, StringViewError>
+  checked_split_by(char delimiter) const noexcept {
+    if (empty()) {
+      return MakeUnexpected(StringViewError::EmptyView);
+    }
+
+    for (size_type i = 0; i < m_length; ++i) {
+      if (m_string[i] == delimiter) {
+        return StringView(m_string, i);
+      }
+    }
+    // If no delimiter is found, return the whole string as the singular token
+    return *this;
   }
 };
 } // namespace vapor
