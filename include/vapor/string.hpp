@@ -12,8 +12,6 @@
 
 namespace vapor {
 
-enum class StringError { OutOfMemory, OutOfBounds, EmptyString };
-
 class VAPOR_NODISCARD String {
 public:
   typedef char value_type;
@@ -30,7 +28,7 @@ private:
   size_type m_capacity;
 
   // Internal helper to establish initial memory bounds cleanly
-  Expected<void, StringError> AllocateBuffer(size_type cap) noexcept {
+  Expected<void, CommonError> AllocateBuffer(size_type cap) noexcept {
     if (cap == 0)
       return {};
 
@@ -38,7 +36,7 @@ private:
     // '\0'
     void *raw = m_allocator->Allocate(cap + 1);
     if (!raw)
-      return MakeUnexpected(StringError::OutOfMemory);
+      return MakeUnexpected(CommonError::OutOfMemory);
 
     m_data = static_cast<pointer>(raw);
     m_capacity = cap;
@@ -61,7 +59,7 @@ public:
   // Creates a vapor::String from a std::string, returning an out-of-memory
   // error if allocation fails
   template <typename Traits, typename Alloc>
-  VAPOR_NODISCARD static Expected<String, StringError>
+  VAPOR_NODISCARD static Expected<String, CommonError>
   FromStdString(const std::basic_string<value_type, Traits, Alloc> &str,
                 Allocator &alloc = DefaultAllocator::GetDefault()) noexcept {
     String new_string(alloc);
@@ -78,7 +76,7 @@ public:
 
   // In-place assignment from a std::string that returns a validation token
   template <typename Traits, typename Alloc>
-  Expected<void, StringError>
+  Expected<void, CommonError>
   assign(const std::basic_string<value_type, Traits, Alloc> &str) noexcept {
     clear();
     return append(StringView(str.data(), str.size()));
@@ -87,7 +85,7 @@ public:
 
   ~String() {
     if (m_data) {
-      m_allocator->Deallocate(m_data);
+      m_allocator->Deallocate(m_data, m_capacity + 1);
     }
   }
 
@@ -102,7 +100,7 @@ public:
   String &operator=(String &&other) noexcept {
     if (this != &other) {
       if (m_data)
-        m_allocator->Deallocate(m_data);
+        m_allocator->Deallocate(m_data, m_capacity + 1);
       m_allocator = other.m_allocator;
       m_data = other.m_data;
       m_length = other.m_length;
@@ -121,7 +119,7 @@ public:
   String &operator=(const String &) = delete;
 
   // Deep copy factory method that returns an Expected wrapper
-  Expected<String, StringError> Clone() const & noexcept {
+  Expected<String, CommonError> Clone() const & noexcept {
     String copy(*m_allocator);
     if (m_length > 0) {
       auto res = copy.reserve(m_capacity);
@@ -137,13 +135,13 @@ public:
     return copy;
   }
 
-  VAPOR_NODISCARD Expected<String, StringError> Clone() const && noexcept {
+  VAPOR_NODISCARD Expected<String, CommonError> Clone() && noexcept {
     // The object is a temporary! Instead of deep copying,
     // we can cheaply cast ourselves to a mutable rvalue and move our data out.
-    return String(std::move(*const_cast<String *>(this)));
+    return String(static_cast<String &&>(*const_cast<String *>(this)));
   }
 
-  Expected<void, StringError> reserve(size_type new_capacity) noexcept {
+  Expected<void, CommonError> reserve(size_type new_capacity) noexcept {
     if (new_capacity <= m_capacity)
       return {};
 
@@ -153,14 +151,14 @@ public:
 
     void *raw = m_allocator->Reallocate(m_data, new_capacity + 1);
     if (!raw)
-      return MakeUnexpected(StringError::OutOfMemory);
+      return MakeUnexpected(CommonError::OutOfMemory);
 
     m_data = static_cast<pointer>(raw);
     m_capacity = new_capacity;
     return {};
   }
 
-  Expected<void, StringError> push_back(char c) noexcept {
+  Expected<void, CommonError> push_back(char c) noexcept {
     if (m_length >= m_capacity) {
       size_type new_cap = m_capacity == 0 ? 8 : m_capacity * 2;
       auto res = reserve(new_cap);
@@ -174,7 +172,7 @@ public:
     return {};
   }
 
-  Expected<void, StringError> append(StringView sv) noexcept {
+  Expected<void, CommonError> append(StringView sv) noexcept {
     if (sv.empty())
       return {};
 
@@ -197,9 +195,9 @@ public:
     return {};
   }
 
-  Expected<void, StringError> erase(size_type pos, size_type count) noexcept {
+  Expected<void, CommonError> erase(size_type pos, size_type count) noexcept {
     if (pos >= m_length)
-      return MakeUnexpected(StringError::OutOfBounds);
+      return MakeUnexpected(CommonError::OutOfBounds);
     if (count == 0)
       return {};
 
@@ -232,9 +230,9 @@ public:
   VAPOR_NODISCARD const_pointer data() const & noexcept {
     return m_data ? m_data : "";
   }
-  VAPOR_NODISCARD Expected<pointer, StringError> try_data() & noexcept {
+  VAPOR_NODISCARD Expected<pointer, CommonError> try_data() & noexcept {
     if (!m_data || m_length == 0)
-      return MakeUnexpected(StringError::EmptyString);
+      return MakeUnexpected(CommonError::EmptyString);
     return m_data;
   }
 
@@ -243,18 +241,18 @@ public:
   }
 
   VAPOR_NODISCARD
-  VAPOR_CXX20_CONSTEXPR Expected<ReferenceWrapper<char>, StringError>
+  VAPOR_CXX20_CONSTEXPR Expected<ReferenceWrapper<char>, CommonError>
   checked_at(size_type pos) & noexcept {
     if (pos >= m_length)
-      return MakeUnexpected(StringError::OutOfBounds);
+      return MakeUnexpected(CommonError::OutOfBounds);
     return ReferenceWrapper<char>(m_data[pos]);
   }
 
   VAPOR_NODISCARD
-  VAPOR_CXX20_CONSTEXPR Expected<ReferenceWrapper<const char>, StringError>
+  VAPOR_CXX20_CONSTEXPR Expected<ReferenceWrapper<const char>, CommonError>
   checked_at(size_type pos) const & noexcept {
     if (pos >= m_length)
-      return MakeUnexpected(StringError::OutOfBounds);
+      return MakeUnexpected(CommonError::OutOfBounds);
     return ReferenceWrapper<const char>(m_data[pos]);
   }
 };

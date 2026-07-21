@@ -62,7 +62,7 @@ TEST(StringTest, AppendAndEraseBlockDataOperations) {
   // Erase out of bounds check
   auto bad_erase = str.erase(10, 2);
   EXPECT_FALSE(bad_erase.has_value());
-  EXPECT_EQ(bad_erase.error(), vapor::StringError::OutOfBounds);
+  EXPECT_EQ(bad_erase.error(), vapor::CommonError::OutOfBounds);
 }
 
 TEST(StringTest, CheckedElementAccess) {
@@ -79,7 +79,7 @@ TEST(StringTest, CheckedElementAccess) {
 
   auto char_bad = str.checked_at(5);
   EXPECT_FALSE(char_bad.has_value());
-  EXPECT_EQ(char_bad.error(), vapor::StringError::OutOfBounds);
+  EXPECT_EQ(char_bad.error(), vapor::CommonError::OutOfBounds);
 }
 
 TEST(StringTest, MoveSemanticsAndExplicitCloning) {
@@ -180,7 +180,7 @@ TEST(StringTest, TryDataHandling) {
   vapor::String empty_str;
   auto fail_res1 = empty_str.try_data();
   EXPECT_FALSE(fail_res1.has_value());
-  EXPECT_EQ(fail_res1.error(), vapor::StringError::EmptyString);
+  EXPECT_EQ(fail_res1.error(), vapor::CommonError::EmptyString);
 
   vapor::String cleared_str;
   ASSERT_TRUE(cleared_str.append(vapor::StringView("Buffer")).has_value());
@@ -188,7 +188,7 @@ TEST(StringTest, TryDataHandling) {
 
   auto fail_res2 = cleared_str.try_data();
   EXPECT_FALSE(fail_res2.has_value());
-  EXPECT_EQ(fail_res2.error(), vapor::StringError::EmptyString);
+  EXPECT_EQ(fail_res2.error(), vapor::CommonError::EmptyString);
 
   vapor::String populated_str;
   ASSERT_TRUE(populated_str.append(vapor::StringView("Vapor")).has_value());

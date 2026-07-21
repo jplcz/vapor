@@ -26,7 +26,7 @@ public:
   VAPOR_NODISCARD virtual void *
   Reallocate(void *ptr, size_t new_size,
              size_t alignment = alignof(max_align_t)) noexcept = 0;
-  virtual void Deallocate(void *ptr) noexcept = 0;
+  virtual void Deallocate(void *ptr, size_t size) noexcept = 0;
 
   // Utility construct/destroy helpers to bypass standard layout restrictions
   template <typename T, typename... Args>
@@ -63,7 +63,7 @@ public:
     return ::realloc(ptr, new_size);
   }
 
-  void Deallocate(void *ptr) noexcept override { ::free(ptr); }
+  void Deallocate(void *ptr, size_t) noexcept override { ::free(ptr); }
 
   static DefaultAllocator &GetDefault() noexcept {
     static DefaultAllocator instance;

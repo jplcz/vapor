@@ -16,8 +16,6 @@
 
 namespace vapor {
 
-enum class StringViewError { OutOfBounds, EmptyView, ValueNotFound };
-
 struct VAPOR_NODISCARD StringView {
   typedef char value_type;
   typedef char *pointer;
@@ -220,22 +218,22 @@ struct VAPOR_NODISCARD StringView {
 
   // --- Checked Character Queries ---
 
-  VAPOR_NODISCARD VAPOR_CXX20_CONSTEXPR Expected<size_type, StringViewError>
+  VAPOR_NODISCARD VAPOR_CXX20_CONSTEXPR Expected<size_type, CommonError>
   checked_find(char c, size_type pos = 0) const noexcept {
     if (pos >= m_length) {
-      return MakeUnexpected(StringViewError::OutOfBounds);
+      return MakeUnexpected(CommonError::OutOfBounds);
     }
     for (size_type i = pos; i < m_length; ++i) {
       if (m_string[i] == c)
         return i;
     }
-    return MakeUnexpected(StringViewError::ValueNotFound);
+    return MakeUnexpected(CommonError::ValueNotFound);
   }
 
-  VAPOR_NODISCARD VAPOR_CXX20_CONSTEXPR Expected<size_type, StringViewError>
+  VAPOR_NODISCARD VAPOR_CXX20_CONSTEXPR Expected<size_type, CommonError>
   checked_find(StringView sv, size_type pos = 0) const noexcept {
     if (pos + sv.size() > m_length) {
-      return MakeUnexpected(StringViewError::OutOfBounds);
+      return MakeUnexpected(CommonError::OutOfBounds);
     }
     if (sv.empty())
       return pos;
@@ -251,63 +249,63 @@ struct VAPOR_NODISCARD StringView {
       if (match)
         return i;
     }
-    return MakeUnexpected(StringViewError::ValueNotFound);
+    return MakeUnexpected(CommonError::ValueNotFound);
   }
 
   // --- Checked Element Access ---
 
-  VAPOR_NODISCARD VAPOR_CXX20_CONSTEXPR
-      Expected<ReferenceWrapper<const char>, StringViewError>
-      checked_at(size_type pos) const noexcept {
+  VAPOR_NODISCARD
+  VAPOR_CXX20_CONSTEXPR Expected<ReferenceWrapper<const char>, CommonError>
+  checked_at(size_type pos) const noexcept {
     if (pos >= m_length) {
-      return MakeUnexpected(StringViewError::OutOfBounds);
+      return MakeUnexpected(CommonError::OutOfBounds);
     }
     // Automatically wraps the reference seamlessly
     return ReferenceWrapper<const char>(m_string[pos]);
   }
 
-  VAPOR_NODISCARD VAPOR_CXX20_CONSTEXPR
-      Expected<ReferenceWrapper<const char>, StringViewError>
-      checked_front() const noexcept {
+  VAPOR_NODISCARD
+  VAPOR_CXX20_CONSTEXPR Expected<ReferenceWrapper<const char>, CommonError>
+  checked_front() const noexcept {
     if (empty()) {
-      return MakeUnexpected(StringViewError::EmptyView);
+      return MakeUnexpected(CommonError::EmptyString);
     }
     return ReferenceWrapper<const char>(*m_string);
   }
 
-  VAPOR_NODISCARD VAPOR_CXX20_CONSTEXPR
-      Expected<ReferenceWrapper<const char>, StringViewError>
-      checked_back() const noexcept {
+  VAPOR_NODISCARD
+  VAPOR_CXX20_CONSTEXPR Expected<ReferenceWrapper<const char>, CommonError>
+  checked_back() const noexcept {
     if (empty()) {
-      return MakeUnexpected(StringViewError::EmptyView);
+      return MakeUnexpected(CommonError::EmptyString);
     }
     return ReferenceWrapper<const char>(*(m_string + m_length - 1));
   }
 
   // --- Checked Trimming & Slicing ---
 
-  VAPOR_NODISCARD VAPOR_CXX20_CONSTEXPR Expected<StringView, StringViewError>
+  VAPOR_NODISCARD VAPOR_CXX20_CONSTEXPR Expected<StringView, CommonError>
   checked_remove_prefix(size_type n) const noexcept {
     if (n > m_length) {
-      return MakeUnexpected(StringViewError::OutOfBounds);
+      return MakeUnexpected(CommonError::OutOfBounds);
     }
     return StringView(m_string + n, m_length - n);
   }
 
-  VAPOR_NODISCARD VAPOR_CXX20_CONSTEXPR Expected<StringView, StringViewError>
+  VAPOR_NODISCARD VAPOR_CXX20_CONSTEXPR Expected<StringView, CommonError>
   checked_remove_suffix(size_type n) const noexcept {
     if (n > m_length) {
-      return MakeUnexpected(StringViewError::OutOfBounds);
+      return MakeUnexpected(CommonError::OutOfBounds);
     }
     return StringView(m_string, m_length - n);
   }
 
   // --- Checked Tokenization / Splitting ---
 
-  VAPOR_NODISCARD VAPOR_CXX20_CONSTEXPR Expected<StringView, StringViewError>
+  VAPOR_NODISCARD VAPOR_CXX20_CONSTEXPR Expected<StringView, CommonError>
   checked_split_by(char delimiter) const noexcept {
     if (empty()) {
-      return MakeUnexpected(StringViewError::EmptyView);
+      return MakeUnexpected(CommonError::EmptyString);
     }
 
     for (size_type i = 0; i < m_length; ++i) {

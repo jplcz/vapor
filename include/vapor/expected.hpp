@@ -162,6 +162,11 @@ public:
     return m_value;
   }
 
+  VAPOR_NODISCARD VAPOR_CXX14_CONSTEXPR T &&value() && {
+    assert(m_has_value);
+    return static_cast<T &&>(m_value);
+  }
+
   VAPOR_NODISCARD VAPOR_CXX14_CONSTEXPR T &value() & {
     assert(m_has_value);
     return m_value;

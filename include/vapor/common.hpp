@@ -9,4 +9,13 @@ template <typename T> VAPOR_NODISCARD inline T Min(T a, T b) noexcept {
 template <typename T> VAPOR_NODISCARD inline T Max(T a, T b) noexcept {
   return (a > b) ? a : b;
 }
+
+enum class CommonError {
+  OutOfMemory,
+  OutOfBounds,
+  EmptyString,
+  ValueNotFound,
+  UnsupportedOperation
+};
+
 } // namespace vapor
