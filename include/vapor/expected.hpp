@@ -1,6 +1,7 @@
 #pragma once
 #include <assert.h>
 #include <vapor/config.hpp>
+#include <vapor/utility.hpp>
 
 #if defined(VAPOR_USE_STL) && (__cplusplus >= 202002L)
 #if defined(__has_include)
@@ -53,7 +54,7 @@ public:
   }
 
   VAPOR_CXX14_CONSTEXPR Expected(T &&val) : m_has_value(true) {
-    new (&m_value) T(static_cast<T &&>(val));
+    new (&m_value) T(Move(val));
   }
 
   VAPOR_CXX14_CONSTEXPR Expected(const Unexpected<E> &unex)
@@ -62,7 +63,7 @@ public:
   }
 
   VAPOR_CXX14_CONSTEXPR Expected(Unexpected<E> &&unex) : m_has_value(false) {
-    new (&m_error) E(static_cast<E &&>(unex.error));
+    new (&m_error) E(Move(unex.error));
   }
 
   // --- Copy & Move Rules (Required for Non-POD Union types) ---
@@ -164,7 +165,7 @@ public:
 
   VAPOR_NODISCARD VAPOR_CXX14_CONSTEXPR T &&value() && {
     assert(m_has_value);
-    return static_cast<T &&>(m_value);
+    return Move(m_value);
   }
 
   VAPOR_NODISCARD VAPOR_CXX14_CONSTEXPR T &value() & {
@@ -230,7 +231,7 @@ public:
   }
 
   VAPOR_CXX14_CONSTEXPR Expected(Unexpected<E> &&unex) : m_has_value(false) {
-    new (&m_error) E(static_cast<E &&>(unex.error));
+    new (&m_error) E(Move(unex.error));
   }
 
   // --- Copy & Move Lifecycles ---
@@ -245,7 +246,7 @@ public:
   VAPOR_CXX14_CONSTEXPR Expected(Expected &&other) noexcept
       : m_has_value(other.m_has_value) {
     if (!m_has_value) {
-      new (&m_error) E(static_cast<E &&>(other.m_error));
+      new (&m_error) E(Move(other.m_error));
     }
   }
 
@@ -265,7 +266,7 @@ public:
       destroy();
       m_has_value = other.m_has_value;
       if (!m_has_value) {
-        new (&m_error) E(static_cast<E &&>(other.m_error));
+        new (&m_error) E(Move(other.m_error));
       }
     }
     return *this;
@@ -285,7 +286,7 @@ public:
   VAPOR_CXX14_CONSTEXPR Expected(std::expected<void, E> &&other)
       : m_has_value(other.has_value()) {
     if (!m_has_value) {
-      new (&m_error) E(static_cast<E &&>(other.error()));
+      new (&m_error) E(Move(other.error()));
     }
   }
 
@@ -299,7 +300,7 @@ public:
   VAPOR_NODISCARD VAPOR_CXX14_CONSTEXPR operator std::expected<void, E>() && {
     if (m_has_value)
       return {};
-    return std::unexpected<E>(static_cast<E &&>(m_error));
+    return std::unexpected<E>(Move(m_error));
   }
 #endif
 

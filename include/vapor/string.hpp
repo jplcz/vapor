@@ -5,6 +5,7 @@
 #include <vapor/common.hpp>
 #include <vapor/expected.hpp>
 #include <vapor/string_view.hpp>
+#include <vapor/utility.hpp>
 
 #if defined(VAPOR_USE_STL)
 #include <string>
@@ -138,7 +139,7 @@ public:
   VAPOR_NODISCARD Expected<String, CommonError> Clone() && noexcept {
     // The object is a temporary! Instead of deep copying,
     // we can cheaply cast ourselves to a mutable rvalue and move our data out.
-    return String(static_cast<String &&>(*const_cast<String *>(this)));
+    return String(Move(*const_cast<String *>(this)));
   }
 
   Expected<void, CommonError> reserve(size_type new_capacity) noexcept {

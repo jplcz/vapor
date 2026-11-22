@@ -33,3 +33,26 @@ FetchContent_MakeAvailable(vapor)
 # Link directly against the interface target
 target_link_libraries(your_project PRIVATE vapor::vapor)
 ```
+
+## Generic Utilities (STL-free)
+
+Templates often need to ask questions about types ("is `T` trivially copyable?") or move/forward
+values. The STL answers these in `<type_traits>` and `<utility>`, which are not available in
+freestanding or kernel builds. Vapor ships its own versions built only on language features and
+compiler intrinsics (special `__is_*` keywords provided by GCC, Clang and MSVC).
+
+* `vapor/type_traits.hpp` — `IsSame`, `EnableIf`, `Conditional`, `RemoveReference`, `RemoveCV`,
+  `Decay`, `IsConvertible`, `IsNothrowMoveConstructible`, plus intrinsic-backed `IsTriviallyCopyable`,
+  `IsTriviallyDestructible`, `IsTrivial`, `IsStandardLayout`, `IsPod`, `IsEmpty`, `IsAggregate`, `IsEnum`,
+  `IsUnion`, `IsClass`, `IsPolymorphic`, `IsAbstract`, `IsFinal`, `IsBaseOf`, `IsTriviallyConstructible`,
+  `IsNothrowConstructible`, `IsNothrowAssignable`, `UnderlyingType`, ...
+  Intrinsic-backed traits only use builtins present in GCC 9, Clang and MSVC (the minimum supported compilers).
+  Use `Trait<T>::value` / `Trait<T>::type`, or the `TraitT<T>` alias for the type.
+* `vapor/utility.hpp` — `Move`, `Forward`, `Swap`, `Exchange`, `AddressOf`.
+  `Move(x)` hands over ownership of `x`; `Forward<T>(x)` passes `x` on exactly as the caller
+  supplied it (lvalue stays lvalue, rvalue stays rvalue) inside `template <typename T> f(T &&x)`.
+
+```cpp
+template <typename T, vapor::EnableIfT<vapor::IsTriviallyCopyable<T>::value, int> = 0>
+void Copy(T *dst, const T *src, size_t n) { memcpy(dst, src, n * sizeof(T)); }
+```

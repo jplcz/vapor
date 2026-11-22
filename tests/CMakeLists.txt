@@ -21,7 +21,8 @@ foreach (STD ${CPP_STANDARDS})
                 test_string_view.cpp
                 test_span.cpp
                 test_string.cpp
-                test_functional.cpp)
+                test_functional.cpp
+                test_type_traits.cpp)
 
         target_compile_features(${TEST_TARGET} PRIVATE cxx_std_${STD})
 

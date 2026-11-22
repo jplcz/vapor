@@ -4,6 +4,7 @@
 #include <vapor/common.hpp>
 #include <vapor/expected.hpp>
 #include <vapor/reference_wrapper.hpp>
+#include <vapor/type_traits.hpp>
 
 #if defined(VAPOR_USE_STL) && (__cplusplus >= 202002L)
 #if defined(__has_include)
@@ -254,7 +255,7 @@ template <typename T> struct hash<vapor::Span<T>> {
     // If T is a trivially copyable type (like int, float, char),
     // we can treat the entire span as a raw string of bytes and recycle
     // std::string_view's hash!
-    if (std::is_trivially_copyable<T>::value) {
+    if (vapor::IsTriviallyCopyable<T>::value) {
       return std::hash<std::string_view>{}(std::string_view(
           reinterpret_cast<const char *>(s.data()), s.size_bytes()));
     }

@@ -2,6 +2,7 @@
 #include <vapor/allocator.hpp>
 #include <vapor/common.hpp>
 #include <vapor/expected.hpp>
+#include <vapor/utility.hpp>
 
 namespace vapor {
 
@@ -73,12 +74,12 @@ public:
   VAPOR_NODISCARD Expected<Function, CommonError> Clone() && noexcept {
     // The object is a temporary! Instead of deep copying,
     // we can cheaply cast ourselves to a mutable rvalue and move our data out.
-    return Function(static_cast<Function &&>(*this));
+    return Function(Move(*this));
   }
 
   R operator()(Args &&...args) const noexcept {
     assert(m_vtable != nullptr);
-    return m_vtable->invoke(&m_storage, static_cast<Args &&>(args)...);
+    return m_vtable->invoke(&m_storage, Forward<Args>(args)...);
   }
 
   template <typename F>
@@ -101,7 +102,7 @@ public:
     if constexpr (sizeof(Callable) <= SOO_SIZE &&
                   alignof(Callable) <= alignof(storage)) {
       // Fits in SOO buffer
-      new (&f.m_storage.buffer) Callable(static_cast<Callable &&>(func));
+      new (&f.m_storage.buffer) Callable(Move(func));
       f.m_vtable = &function_vtable_factory<Callable, R, Args...>::soo_instance;
     } else {
       // Requires heap allocation
@@ -109,7 +110,7 @@ public:
       if (!res)
         return Unexpected(CommonError::OutOfMemory);
 
-      new (res) Callable(static_cast<Callable &&>(func));
+      new (res) Callable(Move(func));
 
       f.m_storage.heap_ptr = res;
       f.m_vtable =
@@ -120,7 +121,7 @@ public:
 
   template <typename F>
   static Expected<Function, CommonError> Create(F func) noexcept {
-    return Allocate(static_cast<F &&>(func), DefaultAllocator::GetDefault());
+    return Allocate(Forward<F>(func), DefaultAllocator::GetDefault());
   }
 
   ~Function() noexcept {
@@ -152,7 +153,7 @@ private:
         [](const storage *s, Args... args) -> R {
           // Direct call: No indirection through a captured objectx
           auto fp = reinterpret_cast<R (*)(Args...)>(s->func_ptr);
-          return fp(static_cast<Args1 &&>(args)...);
+          return fp(Forward<Args1>(args)...);
         },
         [](storage *, Allocator &) { /* No-op */ },
         [](storage *src, storage *dest) { dest->func_ptr = src->func_ptr; },
@@ -171,12 +172,12 @@ private:
     static constexpr typename Function<R1(Args1...)>::vtable soo_instance = {
         [](const storage *s, Args1... args) -> R {
           return (*reinterpret_cast<const F *>(s->buffer))(
-              static_cast<Args &&>(args)...);
+              Forward<Args>(args)...);
         },
         [](storage *s, Allocator &) { reinterpret_cast<F *>(s->buffer)->~F(); },
         [](storage *src, auto *dest) {
           new (dest->buffer)
-              F(static_cast<F &&>(*reinterpret_cast<F *>(src->buffer)));
+              F(Move(*reinterpret_cast<F *>(src->buffer)));
           reinterpret_cast<F *>(src->buffer)->~F();
         },
         [](const storage *s, Allocator &) -> Expected<void *, CommonError> {
@@ -194,7 +195,7 @@ private:
     static constexpr typename Function<R1(Args1...)>::vtable heap_instance = {
         [](const storage *s, Args1... args) -> R {
           return (*static_cast<const F *>(s->heap_ptr))(
-              static_cast<Args1 &&>(args)...);
+              Forward<Args1>(args)...);
         },
         [](storage *s, Allocator &alloc) {
           static_cast<F *>(s->heap_ptr)->~F();

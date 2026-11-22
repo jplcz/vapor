@@ -1,6 +1,7 @@
 #pragma once
 #include <stddef.h>
 #include <vapor/common.hpp>
+#include <vapor/utility.hpp>
 
 #if defined(VAPOR_USE_STL)
 #include <new> // Standard placement new definition
@@ -31,7 +32,7 @@ public:
   // Utility construct/destroy helpers to bypass standard layout restrictions
   template <typename T, typename... Args>
   void Construct(T *ptr, Args &&...args) {
-    new (static_cast<void *>(ptr)) T(static_cast<Args &&>(args)...);
+    new (static_cast<void *>(ptr)) T(Forward<Args>(args)...);
   }
 
   template <typename T> void Destroy(T *ptr) noexcept {
