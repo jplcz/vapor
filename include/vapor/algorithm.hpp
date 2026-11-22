@@ -685,6 +685,464 @@ template <typename It> void StableSort(It first, It last) {
   StableSort(first, last, detail::LessOp());
 }
 
+// ------------------------------------------------- numeric / transform family
+// Small building blocks that replace hand-written loops.
+
+// Calls f(*it) for every element; returns f so that state kept in a functor
+// can be read afterwards.
+template <typename It, typename F> F ForEach(It first, It last, F f) {
+  for (; first != last; ++first)
+    f(*first);
+  return f;
+}
+
+// Folds the range into one value: init = op(init, *it) for every element.
+template <typename It, typename T> VAPOR_NODISCARD T Accumulate(It first, It last, T init) {
+  for (; first != last; ++first)
+    init = Move(init) + *first;
+  return init;
+}
+template <typename It, typename T, typename Op>
+VAPOR_NODISCARD T Accumulate(It first, It last, T init, Op op) {
+  for (; first != last; ++first)
+    init = op(Move(init), *first);
+  return init;
+}
+
+// Writes f(*it) for every element to `out`; returns the end of the output.
+template <typename It, typename Out, typename F>
+Out Transform(It first, It last, Out out, F f) {
+  for (; first != last; ++first, ++out)
+    *out = f(*first);
+  return out;
+}
+template <typename It1, typename It2, typename Out, typename F>
+Out Transform(It1 first1, It1 last1, It2 first2, Out out, F f) {
+  for (; first1 != last1; ++first1, ++first2, ++out)
+    *out = f(*first1, *first2);
+  return out;
+}
+
+// Fills the range with value, value + 1, value + 2, ...
+template <typename It, typename T> void Iota(It first, It last, T value) {
+  for (; first != last; ++first, ++value)
+    *first = value;
+}
+// Fills the range with successive results of g().
+template <typename It, typename G> void Generate(It first, It last, G g) {
+  for (; first != last; ++first)
+    *first = g();
+}
+template <typename It, typename Pred, typename Out>
+Out CopyIf(It first, It last, Out out, Pred pred) {
+  for (; first != last; ++first)
+    if (pred(*first)) {
+      *out = *first;
+      ++out;
+    }
+  return out;
+}
+template <typename It, typename Out>
+Out CopyN(It first, size_t n, Out out) {
+  for (; n != 0; --n, ++first, ++out)
+    *out = *first;
+  return out;
+}
+template <typename It, typename T>
+void Replace(It first, It last, const T &old_value, const T &new_value) {
+  for (; first != last; ++first)
+    if (*first == old_value)
+      *first = new_value;
+}
+
+// First position whose element equals its successor (`last` if none).
+template <typename It, typename Eq>
+VAPOR_NODISCARD It AdjacentFind(It first, It last, Eq eq) {
+  if (first == last)
+    return last;
+  It next = first;
+  for (++next; next != last; ++first, ++next)
+    if (eq(*first, *next))
+      return first;
+  return last;
+}
+template <typename It> VAPOR_NODISCARD It AdjacentFind(It first, It last) {
+  return AdjacentFind(first, last,
+                      [](const detail::IterValueT<It> &a,
+                         const detail::IterValueT<It> &b) { return a == b; });
+}
+
+// First occurrence of the sequence [first2, last2) inside [first1, last1)
+// (`last1` if absent). An empty needle matches at `first1`.
+template <typename It1, typename It2, typename Eq>
+VAPOR_NODISCARD It1 Search(It1 first1, It1 last1, It2 first2, It2 last2,
+                           Eq eq) {
+  for (;; ++first1) {
+    It1 a = first1;
+    It2 b = first2;
+    for (;; ++a, ++b) {
+      if (b == last2)
+        return first1;
+      if (a == last1)
+        return last1;
+      if (!eq(*a, *b))
+        break;
+    }
+  }
+}
+template <typename It1, typename It2>
+VAPOR_NODISCARD It1 Search(It1 first1, It1 last1, It2 first2, It2 last2) {
+  return Search(first1, last1, first2, last2,
+                [](const detail::IterValueT<It1> &a,
+                   const detail::IterValueT<It2> &b) { return a == b; });
+}
+
+// -------------------------------------------------------------- partitioning
+
+// True when every element satisfying pred comes before every one that does
+// not.
+template <typename It, typename Pred>
+VAPOR_NODISCARD bool IsPartitioned(It first, It last, Pred pred) {
+  first = FindIfNot(first, last, pred);
+  return FindIf(first, last, pred) == last;
+}
+
+// Moves elements satisfying pred to the front; returns the first element of
+// the second group. Not stable (relative order may change).
+template <typename It, typename Pred> It Partition(It first, It last, Pred pred) {
+  first = FindIfNot(first, last, pred);
+  if (first == last)
+    return first;
+  for (It it = first; ++it != last;)
+    if (pred(*it)) {
+      Swap(*it, *first);
+      ++first;
+    }
+  return first;
+}
+
+// Like Partition but keeps the relative order inside both groups. Needs
+// random-access iterators; uses O(n log n) swaps and no extra memory.
+template <typename It, typename Pred>
+It StablePartition(It first, It last, Pred pred) {
+  ptrdiff_t n = last - first;
+  if (n == 0)
+    return first;
+  if (n == 1)
+    return pred(*first) ? last : first;
+  It mid = first + n / 2;
+  It left = StablePartition(first, mid, pred);
+  It right = StablePartition(mid, last, pred);
+  return Rotate(left, mid, right);
+}
+
+// In a partitioned range, the first element that does not satisfy pred
+// (binary search; random-access iterators).
+template <typename It, typename Pred>
+VAPOR_NODISCARD It PartitionPoint(It first, It last, Pred pred) {
+  ptrdiff_t len = last - first;
+  while (len > 0) {
+    ptrdiff_t half = len / 2;
+    It mid = first + half;
+    if (pred(*mid)) {
+      first = mid + 1;
+      len -= half + 1;
+    } else {
+      len = half;
+    }
+  }
+  return first;
+}
+
+template <typename It, typename OutT, typename OutF, typename Pred>
+Pair<OutT, OutF> PartitionCopy(It first, It last, OutT out_true, OutF out_false,
+                               Pred pred) {
+  for (; first != last; ++first) {
+    if (pred(*first)) {
+      *out_true = *first;
+      ++out_true;
+    } else {
+      *out_false = *first;
+      ++out_false;
+    }
+  }
+  return Pair<OutT, OutF>(out_true, out_false);
+}
+
+// ---------------------------------------------------- partial sort / select
+
+// Rearranges so that [first, middle) holds the smallest (middle - first)
+// elements in ascending order; the rest is in unspecified order. Faster than a
+// full Sort when only the top few are needed. Not stable.
+template <typename It, typename Cmp>
+void PartialSort(It first, It middle, It last, Cmp cmp) {
+  if (first == middle)
+    return;
+  MakeHeap(first, middle, cmp);
+  for (It it = middle; it != last; ++it) {
+    if (cmp(*it, *first)) {
+      PopHeap(first, middle, cmp);
+      Swap(*(middle - 1), *it);
+      PushHeap(first, middle, cmp);
+    }
+  }
+  SortHeap(first, middle, cmp);
+}
+template <typename It> void PartialSort(It first, It middle, It last) {
+  PartialSort(first, middle, last, detail::LessOp());
+}
+
+// Rearranges so that *nth is the element a full Sort would put there, with
+// nothing smaller after it and nothing larger before it. Average O(n), worst
+// case O(n log n). Not stable.
+template <typename It, typename Cmp>
+void NthElement(It first, It nth, It last, Cmp cmp) {
+  if (first == last || nth == last)
+    return;
+  size_t depth = 2 * detail::Log2Floor(static_cast<size_t>(last - first));
+  while (last - first > 3) {
+    if (depth == 0) {
+      PartialSort(first, nth + 1, last, cmp);
+      Swap(*first, *nth);
+      return;
+    }
+    --depth;
+    It mid = first + (last - first) / 2;
+    detail::MedianToFirst(first, first + 1, mid, last - 1, cmp);
+    It lo = first + 1;
+    It hi = last;
+    for (;;) {
+      while (cmp(*lo, *first))
+        ++lo;
+      --hi;
+      while (cmp(*first, *hi))
+        --hi;
+      if (!(lo < hi))
+        break;
+      Swap(*lo, *hi);
+      ++lo;
+    }
+    if (lo <= nth)
+      first = lo;
+    else
+      last = lo;
+  }
+  detail::InsertionSort(first, last, cmp);
+}
+template <typename It> void NthElement(It first, It nth, It last) {
+  NthElement(first, nth, last, detail::LessOp());
+}
+
+// ------------------------------------------------- merge and set operations
+// All of these need sorted input ranges (by the same comparator) and write to
+// an output iterator; the output must not overlap the inputs. For the set
+// operations equal elements are handled as in the STL: an element present
+// m times in the first and n times in the second range appears max(m, n)
+// times in the union, min(m, n) in the intersection, max(m - n, 0) in the
+// difference and |m - n| in the symmetric difference.
+
+template <typename It1, typename It2, typename Out, typename Cmp>
+Out Merge(It1 first1, It1 last1, It2 first2, It2 last2, Out out, Cmp cmp) {
+  for (; first1 != last1 && first2 != last2; ++out) {
+    if (cmp(*first2, *first1)) {
+      *out = *first2;
+      ++first2;
+    } else {
+      *out = *first1;
+      ++first1;
+    }
+  }
+  out = Copy(first1, last1, out);
+  return Copy(first2, last2, out);
+}
+template <typename It1, typename It2, typename Out>
+Out Merge(It1 first1, It1 last1, It2 first2, It2 last2, Out out) {
+  return Merge(first1, last1, first2, last2, out, detail::LessOp());
+}
+
+// Merges the sorted halves [first, middle) and [middle, last) in place and
+// stably, without extra memory (random-access iterators).
+template <typename It, typename Cmp>
+void InplaceMerge(It first, It middle, It last, Cmp cmp) {
+  detail::MergeInPlace(first, middle, last,
+                       static_cast<size_t>(middle - first),
+                       static_cast<size_t>(last - middle), cmp);
+}
+template <typename It> void InplaceMerge(It first, It middle, It last) {
+  InplaceMerge(first, middle, last, detail::LessOp());
+}
+
+// True when every element of the second sorted range is in the first.
+template <typename It1, typename It2, typename Cmp>
+VAPOR_NODISCARD bool Includes(It1 first1, It1 last1, It2 first2, It2 last2,
+                              Cmp cmp) {
+  for (; first2 != last2; ++first1) {
+    if (first1 == last1 || cmp(*first2, *first1))
+      return false;
+    if (!cmp(*first1, *first2))
+      ++first2;
+  }
+  return true;
+}
+template <typename It1, typename It2>
+VAPOR_NODISCARD bool Includes(It1 first1, It1 last1, It2 first2, It2 last2) {
+  return Includes(first1, last1, first2, last2, detail::LessOp());
+}
+
+template <typename It1, typename It2, typename Out, typename Cmp>
+Out SetUnion(It1 first1, It1 last1, It2 first2, It2 last2, Out out, Cmp cmp) {
+  while (first1 != last1 && first2 != last2) {
+    if (cmp(*first1, *first2)) {
+      *out = *first1;
+      ++first1;
+    } else if (cmp(*first2, *first1)) {
+      *out = *first2;
+      ++first2;
+    } else {
+      *out = *first1;
+      ++first1;
+      ++first2;
+    }
+    ++out;
+  }
+  out = Copy(first1, last1, out);
+  return Copy(first2, last2, out);
+}
+template <typename It1, typename It2, typename Out>
+Out SetUnion(It1 first1, It1 last1, It2 first2, It2 last2, Out out) {
+  return SetUnion(first1, last1, first2, last2, out, detail::LessOp());
+}
+
+template <typename It1, typename It2, typename Out, typename Cmp>
+Out SetIntersection(It1 first1, It1 last1, It2 first2, It2 last2, Out out,
+                    Cmp cmp) {
+  while (first1 != last1 && first2 != last2) {
+    if (cmp(*first1, *first2)) {
+      ++first1;
+    } else if (cmp(*first2, *first1)) {
+      ++first2;
+    } else {
+      *out = *first1;
+      ++out;
+      ++first1;
+      ++first2;
+    }
+  }
+  return out;
+}
+template <typename It1, typename It2, typename Out>
+Out SetIntersection(It1 first1, It1 last1, It2 first2, It2 last2, Out out) {
+  return SetIntersection(first1, last1, first2, last2, out, detail::LessOp());
+}
+
+template <typename It1, typename It2, typename Out, typename Cmp>
+Out SetDifference(It1 first1, It1 last1, It2 first2, It2 last2, Out out,
+                  Cmp cmp) {
+  while (first1 != last1 && first2 != last2) {
+    if (cmp(*first1, *first2)) {
+      *out = *first1;
+      ++out;
+      ++first1;
+    } else if (cmp(*first2, *first1)) {
+      ++first2;
+    } else {
+      ++first1;
+      ++first2;
+    }
+  }
+  return Copy(first1, last1, out);
+}
+template <typename It1, typename It2, typename Out>
+Out SetDifference(It1 first1, It1 last1, It2 first2, It2 last2, Out out) {
+  return SetDifference(first1, last1, first2, last2, out, detail::LessOp());
+}
+
+template <typename It1, typename It2, typename Out, typename Cmp>
+Out SetSymmetricDifference(It1 first1, It1 last1, It2 first2, It2 last2,
+                           Out out, Cmp cmp) {
+  while (first1 != last1 && first2 != last2) {
+    if (cmp(*first1, *first2)) {
+      *out = *first1;
+      ++out;
+      ++first1;
+    } else if (cmp(*first2, *first1)) {
+      *out = *first2;
+      ++out;
+      ++first2;
+    } else {
+      ++first1;
+      ++first2;
+    }
+  }
+  out = Copy(first1, last1, out);
+  return Copy(first2, last2, out);
+}
+template <typename It1, typename It2, typename Out>
+Out SetSymmetricDifference(It1 first1, It1 last1, It2 first2, It2 last2,
+                           Out out) {
+  return SetSymmetricDifference(first1, last1, first2, last2, out,
+                                detail::LessOp());
+}
+
+// ------------------------------------------------------------- permutations
+
+// Rearranges into the next lexicographically greater permutation and returns
+// true; when already the greatest, wraps to the smallest and returns false.
+// Start from a sorted range to visit every permutation exactly once.
+template <typename It, typename Cmp>
+bool NextPermutation(It first, It last, Cmp cmp) {
+  if (first == last)
+    return false;
+  It i = last;
+  if (first == --i)
+    return false;
+  for (;;) {
+    It i1 = i;
+    if (cmp(*--i, *i1)) {
+      It j = last;
+      while (!cmp(*i, *--j)) {
+      }
+      Swap(*i, *j);
+      Reverse(i1, last);
+      return true;
+    }
+    if (i == first) {
+      Reverse(first, last);
+      return false;
+    }
+  }
+}
+template <typename It> bool NextPermutation(It first, It last) {
+  return NextPermutation(first, last, detail::LessOp());
+}
+// Mirror of NextPermutation: the previous (lexicographically smaller) one.
+template <typename It, typename Cmp>
+bool PrevPermutation(It first, It last, Cmp cmp) {
+  if (first == last)
+    return false;
+  It i = last;
+  if (first == --i)
+    return false;
+  for (;;) {
+    It i1 = i;
+    if (cmp(*i1, *--i)) {
+      It j = last;
+      while (!cmp(*--j, *i)) {
+      }
+      Swap(*i, *j);
+      Reverse(i1, last);
+      return true;
+    }
+    if (i == first) {
+      Reverse(first, last);
+      return false;
+    }
+  }
+}
+template <typename It> bool PrevPermutation(It first, It last) {
+  return PrevPermutation(first, last, detail::LessOp());
+}
+
 // ------------------------------------------------- whole-container overloads
 // `Sort(vec)` instead of `Sort(vec.begin(), vec.end())`. These work with any
 // type that has begin()/end(): Vector, InlineVector, Array, Span, ...
@@ -809,6 +1267,47 @@ VAPOR_NODISCARD auto IsHeap(C &c)
         VAPOR_NODISCARD auto Equal(const A &a, const B &b)
             -> decltype(Equal(a.begin(), a.end(), b.begin(), b.end())) {
   return Equal(a.begin(), a.end(), b.begin(), b.end());
+}
+
+template <typename C, typename T>
+VAPOR_NODISCARD auto Accumulate(const C &c, T init)
+    -> decltype(Accumulate(c.begin(), c.end(), init)) {
+  return Accumulate(c.begin(), c.end(), init);
+}
+template <typename C, typename T, typename Op>
+VAPOR_NODISCARD auto Accumulate(const C &c, T init, Op op)
+    -> decltype(Accumulate(c.begin(), c.end(), init, op)) {
+  return Accumulate(c.begin(), c.end(), init, op);
+}
+template <typename C, typename F>
+auto ForEach(C &c, F f) -> decltype(ForEach(c.begin(), c.end(), f)) {
+  return ForEach(c.begin(), c.end(), f);
+}
+template <typename C, typename Pred>
+auto Partition(C &c, Pred p) -> decltype(Partition(c.begin(), c.end(), p)) {
+  return Partition(c.begin(), c.end(), p);
+}
+template <typename C, typename Pred>
+auto StablePartition(C &c, Pred p)
+    -> decltype(StablePartition(c.begin(), c.end(), p)) {
+  return StablePartition(c.begin(), c.end(), p);
+}
+template <typename C, typename Pred>
+VAPOR_NODISCARD auto IsPartitioned(const C &c, Pred p)
+    -> decltype(IsPartitioned(c.begin(), c.end(), p)) {
+  return IsPartitioned(c.begin(), c.end(), p);
+}
+template <typename C>
+auto NextPermutation(C &c) -> decltype(NextPermutation(c.begin(), c.end())) {
+  return NextPermutation(c.begin(), c.end());
+}
+template <typename C>
+auto PrevPermutation(C &c) -> decltype(PrevPermutation(c.begin(), c.end())) {
+  return PrevPermutation(c.begin(), c.end());
+}
+template <typename C, typename T>
+auto Iota(C &c, T v) -> decltype(Iota(c.begin(), c.end(), v)) {
+  Iota(c.begin(), c.end(), v);
 }
 
 #undef VAPOR_RANGE_CALL0

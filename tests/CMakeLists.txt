@@ -43,7 +43,15 @@ foreach (STD ${CPP_STANDARDS})
                 test_bit_view.cpp
                 test_heap.cpp
                 test_atomic.cpp
-                test_variant.cpp)
+                test_variant.cpp
+                test_algorithm_more.cpp
+                test_scope_guard.cpp
+                test_small_string.cpp
+                test_string_util.cpp
+                test_string_builder.cpp
+                test_shared_ptr.cpp
+                test_hash_map.cpp
+                test_flat_map.cpp)
 
         target_compile_features(${TEST_TARGET} PRIVATE cxx_std_${STD})
 

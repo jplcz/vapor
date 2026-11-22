@@ -29,7 +29,9 @@ enum class CommonError {
   UnsupportedOperation,
   EmptyPointer,
   EmptyOptional,
-  CapacityExceeded
+  CapacityExceeded,
+  InvalidArgument,
+  ValueOutOfRange
 };
 
 } // namespace vapor

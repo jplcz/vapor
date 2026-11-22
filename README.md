@@ -150,6 +150,46 @@ More STL-free building blocks. All of them allocate nothing except `PriorityQueu
   exceptions a `Variant` is never "valueless": it starts as the first alternative, so put
   `Monostate` first when that type has no default constructor.
 
+## Dictionaries, shared ownership, strings and algorithms (round 3)
+
+Added on top of the building blocks above. Same rules everywhere: no exceptions, anything that
+may allocate returns an `Expected`, and copies are explicit (`Clone()`).
+
+* **`HashMap<K, V>` / `HashSet<K>`** (`hash_map.hpp`, `hash_set.hpp`) find a value by key in
+  constant average time, for caches, id-to-object lookups and "have I seen this?" checks.
+  Use `try_emplace(key, args...)`, `find(key)` (compare with `end()`), `contains`, `at` (aborts if
+  missing), `checked_at` (returns an `Expected`), `insert_or_assign`, `erase`. There is no
+  `operator[]` because it would have to insert, which can fail. Inserting may rebuild the table
+  and invalidates all iterators; iteration order is unspecified. A failed insert leaves the map
+  unchanged. For lookups by a different key type (a `StringView` in a `String` map) use
+  `HashMap<String, V, Hash<>, EqualTo<>>`. Internally it is open addressing (all entries in one
+  array, collisions go to the next free slot) with tombstones for erased entries.
+* **`FlatMap<K, V, Cmp>` / `FlatSet<K, Cmp>`** (`flat_map.hpp`, `flat_set.hpp`) keep entries in
+  one sorted array: ordered iteration, `lower_bound`/`upper_bound`/`equal_range`, O(log n)
+  lookup, very cache friendly, but O(n) insert and erase in the middle. Pick them for small or
+  read-mostly maps; pick `HashMap` for large, write-heavy ones.
+* **`SharedPtr<T>` / `WeakPtr<T>`** (`shared_ptr.hpp`) share one object between several owners;
+  it is destroyed when the last `SharedPtr` goes away. A `WeakPtr` observes without keeping it
+  alive (`lock()` returns a `SharedPtr`, empty if the object is gone), which breaks ownership
+  cycles such as parent and child. Reference counts are atomic, so copies may be handed to
+  other threads (the pointed-to object itself is not made thread-safe). Create with
+  `TryMakeShared<T>(args...)` (one allocation for object and counters). No
+  `enable_shared_from_this` and no dynamic cast.
+* **`ScopeGuard` / `VAPOR_DEFER`** (`scope_guard.hpp`) run code when a scope ends, however it
+  ends (return, break): `VAPOR_DEFER { close(fd); };`. `Dismiss()` cancels it.
+* **`SmallString<N>`** (`small_string.hpp`) is a string with fixed inline capacity: no
+  allocation, copyable, returns `CapacityExceeded` when full. Use for short names and labels.
+* **`StringBuilder`** (`string_builder.hpp`) builds text from pieces (`Append` for strings,
+  chars, bools, integers, doubles; `AppendHex`, `AppendJoin`, `AppendAll(a, b, c)`), then
+  `view()`, `c_str()` or `Take()` the finished `String`.
+* **String helpers** (`string_util.hpp`): `Trim`, `Split` (lazy, no allocation),
+  `ConsumePrefix`/`ConsumeSuffix`, `EqualsIgnoreCase` (ASCII only), and strict parsers
+  `ParseInt<T>(text, base)` (rejects junk and overflow with `InvalidArgument` /
+  `ValueOutOfRange`), `ParseBool`, `ParseDouble`.
+* **More algorithms**: `Accumulate`, `Transform`, `Iota`, `Partition`/`StablePartition`,
+  `PartialSort`, `NthElement` (the n-th smallest without full sorting), `Merge`/`InplaceMerge`,
+  `SetUnion`/`SetIntersection`/`SetDifference` on sorted ranges, `NextPermutation`, and more.
+
 ## Building and testing
 
 ```sh

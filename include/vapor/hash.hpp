@@ -34,7 +34,7 @@
 namespace vapor {
 
 // Declared with an extra parameter so that specialisations can be constrained.
-template <typename T, typename = void> struct Hash;
+template <typename T = void, typename = void> struct Hash;
 
 namespace detail {
 // Finaliser from SplitMix64: every input bit affects every output bit.
@@ -112,6 +112,19 @@ template <> struct Hash<StringView, void> {
 template <> struct Hash<String, void> {
   VAPOR_NODISCARD size_t operator()(const String &s) const noexcept {
     return HashBytes(s.data(), s.size());
+  }
+};
+
+// Transparent hash: hashes a value of any type that has its own Hash, so the
+// same function object can be used for several key types. Paired with
+// EqualTo<>, it lets a HashMap<String, V, Hash<>, EqualTo<>> be searched with
+// a StringView without building a String first (String and StringView with
+// the same text hash alike).
+template <> struct Hash<void, void> {
+  typedef void is_transparent;
+  template <typename Q>
+  VAPOR_NODISCARD size_t operator()(const Q &q) const noexcept {
+    return Hash<Q>()(q);
   }
 };
 

@@ -23,6 +23,7 @@ namespace vapor {
     }                                                                          \
   };                                                                           \
   template <> struct Name<void> {                                              \
+    typedef void is_transparent;                                               \
     template <typename A, typename B>                                          \
     VAPOR_NODISCARD constexpr auto operator()(A &&a, B &&b) const              \
         -> decltype(Forward<A>(a) op Forward<B>(b)) {                          \
