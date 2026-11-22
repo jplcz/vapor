@@ -4,7 +4,8 @@
 
 namespace vapor {
 // STL-compatible: return a reference to one of the arguments, so do not keep
-// the result past the lifetime of the arguments (e.g. when passing temporaries).
+// the result past the lifetime of the arguments (e.g. when passing
+// temporaries).
 template <typename T>
 VAPOR_NODISCARD constexpr const T &Min(const T &a, const T &b) {
   return b < a ? b : a;

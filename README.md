@@ -265,6 +265,45 @@ Same rules as before: no exceptions, fallible calls return `Expected`, copies ar
   `HasPrefix(p)`, and `ForEach(prefix, fn)` (auto completion, visits keys in ascending order).
   Erasing frees nodes that no longer lead to a value for reuse.
 
+## Event loop: IoScheduler (round 6)
+
+Programs that handle sockets, pipes or timers must wait for many things at once. One thread per
+thing wastes memory and complicates locking; instead a single loop sleeps in the operating system
+until something is ready and then calls your callback. `IoScheduler` (`io/io_scheduler.hpp`) is a
+small version of that idea (a "reactor", similar to Boost.Asio but much smaller).
+
+```cpp
+IoScheduler io;
+if (!io.Open()) { /* e.g. UnsupportedOperation on non-POSIX platforms */ }
+(void)io.RunAfter(Duration::FromMilliseconds(50), Task::Create([] { /* later */ }).value());
+(void)io.RunEvery(Duration::FromSeconds(1), Task::Create([] { /* heartbeat */ }).value());
+(void)io.Watch(fd, IoEvent::Read, IoCallback::Create([](IoReady r) {
+  /* r.fd is readable (r.events has IoEvent::Read) - call read() yourself */
+}).value());
+(void)io.Post(Task::Create([] { /* hand work to the loop thread */ }).value());  // any thread
+(void)io.Run();   // runs until io.Stop()
+```
+
+* **Why the callbacks only report readiness.** You do the `read`/`write` yourself, so the loop does
+  no hidden buffering and allocates nothing per event. Watching is *level-triggered*: while a
+  descriptor stays ready the callback keeps firing, so read it or `Unwatch` it.
+* **Threads.** Callbacks run on the thread that calls `Run`. Only `Post` and `Stop` may be called
+  from other threads; `Post` wakes a sleeping loop through an internal pipe.
+* **Safe re-entry.** Callbacks may `Post`, schedule, `Cancel` and `Unwatch` (even themselves). Ids
+  are never reused, so a stale id just reports "not found". Repeating timers keep their rhythm
+  (no drift) and skip ticks missed while the loop was busy.
+* **`Fd`** (`io/fd.hpp`) owns a file descriptor (a small integer naming a file, socket or pipe):
+  closes it exactly once, move-only, with `SetNonBlocking`, `SetCloseOnExec`, `Duplicate` and
+  `Fd::MakePipe()`.
+* **Backends.** epoll (Linux), kqueue (BSD, macOS), `poll` and `select` sit behind a tiny
+  `PollBackend` interface. Pass an `IoBackendKind` to `Open`, or pick the default at compile time
+  with `-DVAPOR_IO_BACKEND_EPOLL`, `_KQUEUE`, `_POLL` or `_SELECT`.
+* **Errors equal errno.** `CommonError` values now have the same numbers as the matching `errno.h`
+  constants (`OutOfMemory == ENOMEM`, `WouldBlock == EAGAIN`, ...). `ErrorFromErrno(errno)` and
+  `ErrnoFromError(e)` convert; vapor-only errors (`EmptyString`, ...) use numbers from 1000 up.
+* The `io/` headers are the only ones that include operating-system headers (`unistd.h`,
+  `fcntl.h`, `poll.h`, `sys/epoll.h`, `pthread.h`, ...); everything is still STL-free.
+
 ## Building and testing
 
 ```sh
