@@ -51,7 +51,10 @@ foreach (STD ${CPP_STANDARDS})
                 test_string_builder.cpp
                 test_shared_ptr.cpp
                 test_hash_map.cpp
-                test_flat_map.cpp)
+                test_flat_map.cpp
+                test_containers_r4.cpp
+                test_utilities_r4.cpp
+                test_containers_r5.cpp)
 
         target_compile_features(${TEST_TARGET} PRIVATE cxx_std_${STD})
 

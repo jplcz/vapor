@@ -190,6 +190,81 @@ may allocate returns an `Expected`, and copies are explicit (`Clone()`).
   `PartialSort`, `NthElement` (the n-th smallest without full sorting), `Merge`/`InplaceMerge`,
   `SetUnion`/`SetIntersection`/`SetDifference` on sorted ranges, `NextPermutation`, and more.
 
+## Sequences, ordered maps, text, time and randomness (round 4)
+
+Same rules as before: no exceptions, fallible calls return `Expected`, copies are `Clone()`.
+
+* **`Deque<T>`** (`deque.hpp`) is a double-ended queue: O(1) `push_back`/`push_front`/
+  `pop_back`/`pop_front` and indexing. Use it for work queues and sliding windows where a
+  `Vector` would shift everything on a front removal. It is one circular buffer (the start
+  wraps around the end of the array). No insert/erase in the middle.
+* **`RingBuffer<T, N>`** (`ring_buffer.hpp`) is a first-in-first-out (FIFO) queue of fixed
+  capacity with no allocation. `push_back` returns `CapacityExceeded` when full;
+  `PushOverwrite` drops the oldest element instead (handy for "last N log lines").
+* **`List<T>`** (`list.hpp`) is a doubly linked list. Choose it only when you need elements
+  that never move, or cheap `splice` (moving nodes between lists without copying), `sort`
+  (stable), `merge`, `unique`, `remove`, `reverse`. Otherwise `Vector` is faster.
+* **`SmallVector<T, N>`** (`small_vector.hpp`) keeps up to N elements inside the object and
+  moves to the heap only when it grows past that, so the common small case never allocates.
+  `is_inline()` tells where the data lives; `shrink_to_fit` moves it back.
+* **`Map<K, V>` / `Set<K>`** (`map.hpp`, `set.hpp`) are ordered containers built on a
+  balanced (AVL, named after its inventors) tree: O(log n) insert, erase and lookup at any
+  size, sorted iteration, `lower_bound`/`upper_bound`, and elements that never move, so
+  references stay valid until that element is erased. Same API as `FlatMap`/`FlatSet`. Pick
+  `FlatMap` for small read-mostly data, `Map` when the data is large and changes a lot.
+* **Checked arithmetic** (`checked_math.hpp`): plain `int` math silently wraps or is undefined
+  on overflow, which is a classic source of security bugs when sizes are computed.
+  `CheckedAdd/Sub/Mul/Div/Rem/Neg` return `ValueOutOfRange` (or `InvalidArgument` for a zero
+  divisor), `SaturatingAdd/Sub/Mul` clamp to the type's limits, `CheckedCast<To>(v)` narrows
+  only if the value fits, and `CheckedArraySize(count, element_size)` guards allocations.
+* **`StringInterner`** (`string_interner.hpp`) stores each distinct string once and hands out a
+  small integer id. Comparing ids is a single integer compare, which suits identifiers,
+  property names and symbol tables. Views returned by `Get(id)` stay valid while you add more.
+* **`ReplaceAll`, `ToLowerCase`, `ToUpperCase`, `Repeat`** (`string_ops.hpp`) return new
+  strings (case conversion is ASCII only, so it is locale independent).
+* **Paths** (`path.hpp`) are purely textual (no file system access, `/` separators):
+  `PathBasename`, `PathDirname`, `PathExtension`, `PathStem` (views, no allocation),
+  `PathJoin`, `PathNormalize` (resolves `.`, `..` and repeated slashes).
+* **Time** (`chrono.hpp`): `Duration` (nanoseconds, saturating arithmetic, `FromSeconds`
+  etc.), `SteadyClock` (never goes backwards: use it for measuring), `SystemClock` (wall
+  clock, can jump), `Stopwatch`, and `SleepFor`.
+* **`Random`** (`random.hpp`) is a fast, seedable pseudo-random generator (xoshiro256**):
+  the same seed gives the same sequence, which makes tests and simulations reproducible.
+  `Uniform(lo, hi)` is unbiased, plus `NextDouble`, `NextBool`, `Shuffle`, `Fill`. It works as
+  a standard-style random engine. **It is not cryptographically secure**: never use it for
+  keys, tokens or passwords.
+* **`Format`** (`format.hpp`) builds text from a pattern, like `std::format`:
+  `Format("{} + {} = {}", 1, 2, 3)`, `{1} {0}` for positions, `{{`/`}}` for literal braces.
+  A spec after `:` is `[[fill]align][sign][#][0][width][.precision][type]`, e.g.
+  `{:*^9}`, `{:08.3f}`, `{:#x}`; types are `d x X o b c e E f F g G s p`. Errors (bad pattern, too few
+  arguments, out of memory) come back as `Expected` errors instead of exceptions;
+  `FormatTo(builder, ...)` appends to a `StringBuilder`, `FormatIn(allocator, ...)` picks the
+  allocator.
+
+## Bitsets, adapters, duplicates, type erasure and prefix trees (round 5)
+
+* **`DynamicBitset`** (`dynamic_bitset.hpp`) is `Bitset` with a size chosen at run time: one bit
+  per flag for "which entities are alive" or graph "visited" sets. `resize(n, value)` returns an
+  `Expected`; `FindFirst`/`FindNext` walk the set bits (they return `size()` when done);
+  `&=`, `|=`, `^=` need two sets of equal size.
+* **`Stack<T>` / `Queue<T>`** (`stack.hpp`, `queue.hpp`) expose only last-in-first-out (LIFO) or
+  first-in-first-out (FIFO) operations over a container you can swap (`Vector` or `SmallVector`
+  for the stack, `Deque` or `List` for the queue). Naming the intent prevents accidental
+  middle insertion. `push` returns an `Expected` because it may allocate.
+* **`MultiMap<K, V>` / `MultiSet<K>`** (`multi_map.hpp`, `multi_set.hpp`) are `Map`/`Set` that
+  keep duplicates, in key order with equal keys in insertion order. Use them for one-to-many
+  relations (all handlers for one event) or counting. `equal_range(k)` gives all entries of
+  a key, `count(k)` how many, `erase(k)` removes them all.
+* **`Any`** (`any.hpp`) holds one value of any type without RTTI (run-time type information):
+  `Any::Make<T>(args...)`, then `AnyCast<T>(&any)` returns a pointer, or `nullptr` if you
+  guessed the wrong type, instead of undefined behaviour. Small values are stored inline,
+  larger ones in one allocation. It is move-only; `Clone()` works only for copyable contents.
+  `TypeId<T>()` is the underlying per-type identifier.
+* **`Trie<V>`** (`trie.hpp`) maps byte-string keys to values and answers prefix questions in
+  time proportional to the text length: `LongestPrefix(text)` (routing and mount tables),
+  `HasPrefix(p)`, and `ForEach(prefix, fn)` (auto completion, visits keys in ascending order).
+  Erasing frees nodes that no longer lead to a value for reuse.
+
 ## Building and testing
 
 ```sh

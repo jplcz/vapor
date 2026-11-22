@@ -187,7 +187,9 @@ public:
 
   // Inserts `sv` before `pos`. `sv` must not point into this string.
   Expected<void, CommonError> insert(size_type pos, StringView sv) noexcept {
-    if (pos > m_size)
+    // m_size <= N always holds; stating it lets the compiler prove the
+    // memmove/memcpy below stay inside the buffer.
+    if (pos > m_size || pos > N)
       return MakeUnexpected(CommonError::OutOfBounds);
     if (sv.size() > N - m_size)
       return MakeUnexpected(CommonError::CapacityExceeded);
