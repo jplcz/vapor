@@ -10,12 +10,17 @@ public:
   size_t active_allocations = 0;
   bool should_fail_allocation = false;
 
-  void *Allocate(size_t size, size_t) noexcept override {
+  void *Allocate(size_t size, size_t alignment) noexcept override {
     if (should_fail_allocation) {
       return nullptr;
     }
+    void *p = nullptr;
+    if (alignment < sizeof(void *))
+      alignment = sizeof(void *);
+    if (::posix_memalign(&p, alignment, size) != 0)
+      return nullptr;
     active_allocations++;
-    return ::malloc(size);
+    return p;
   }
 
   void Deallocate(void *ptr, size_t) noexcept override {
@@ -305,11 +310,9 @@ TEST_F(FunctionTest, SelfMoveAssignmentSOO) {
 
   auto &fn = fn_res.value();
 
-// Self-move assignment check
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wself-move"
-  fn = std::move(fn);
-#pragma clang diagnostic pop
+  // Self-move assignment check
+  auto &alias = fn; // an alias keeps compilers from flagging the self-move
+  fn = std::move(alias);
 
   // Function must remain intact and safely executable
   EXPECT_EQ(fn(5), 10);
@@ -323,10 +326,8 @@ TEST_F(FunctionTest, SelfMoveAssignmentHeap) {
   auto &fn = fn_res.value();
   size_t alloc_count_before = mock_alloc.active_allocations;
 
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wself-move"
-  fn = std::move(fn);
-#pragma clang diagnostic pop
+  auto &alias = fn; // an alias keeps compilers from flagging the self-move
+  fn = std::move(alias);
 
   // No double free or premature release of heap allocation
   EXPECT_EQ(mock_alloc.active_allocations, alloc_count_before);

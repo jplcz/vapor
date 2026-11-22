@@ -1,12 +1,11 @@
 #pragma once
 #include <stdint.h>
 
-// Allow explicit opt-out via VAPOR_NO_STL or VAPOR_USE_STL=0
+// vapor does not include any C++ standard library header by default.
+// Define VAPOR_USE_STL=1 to opt in to interoperability with std::string,
+// std::string_view, std::span, std::optional, std::expected and std::hash.
 #if defined(VAPOR_NO_STL) || (defined(VAPOR_USE_STL) && VAPOR_USE_STL == 0)
 #undef VAPOR_USE_STL
-// Otherwise, if VAPOR_USE_STL isn't explicitly defined, default it to ON
-#elif !defined(VAPOR_USE_STL)
-#define VAPOR_USE_STL 1
 #endif
 
 #ifndef VAPOR_NODISCARD
@@ -16,6 +15,17 @@
 #define VAPOR_NODISCARD __attribute__((warn_unused_result))
 #else
 #define VAPOR_NODISCARD // Fallback to nothing on older MSVC/other compilers
+#endif
+#endif
+
+// [[nodiscard]] on a class/struct needs C++17 (or Clang's attribute).
+#ifndef VAPOR_NODISCARD_TYPE
+#if __cplusplus >= 201703L
+#define VAPOR_NODISCARD_TYPE [[nodiscard]]
+#elif defined(__clang__)
+#define VAPOR_NODISCARD_TYPE __attribute__((warn_unused_result))
+#else
+#define VAPOR_NODISCARD_TYPE
 #endif
 #endif
 

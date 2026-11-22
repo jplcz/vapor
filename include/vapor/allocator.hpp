@@ -1,15 +1,8 @@
 #pragma once
 #include <stddef.h>
 #include <vapor/common.hpp>
+#include <vapor/detail/placement_new.hpp>
 #include <vapor/utility.hpp>
-
-#if defined(VAPOR_USE_STL)
-#include <new> // Standard placement new definition
-#else
-// Freestanding placement new signatures required by the compiler
-inline void *operator new(size_t, void *__p) noexcept { return __p; }
-inline void *operator new[](size_t, void *__p) noexcept { return __p; }
-#endif
 
 #if !defined(VAPOR_OVERRIDE_DEFAULT_ALLOCATOR)
 #include <stdlib.h>

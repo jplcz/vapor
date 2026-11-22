@@ -9,8 +9,16 @@ bare-metal development, or ultra-low-latency game engines).
 * **Zero Allocation:** No hidden heap management or performance penalties.
 * **Header-Only:** Instantly integrates into any pipeline without pre-compilation dependencies.
 * **C++11 Baseline Compatibility:** Attempts to fall back to basic language primitives on older toolchains
-* **Modern STL Interoperability:** Automatically provides zero-overhead conversion constructors and operators to 
-  native standard types (`std::string_view`, `std::span`, `std::expected`) when compiled in modern C++ environments.
+* **No STL by default:** vapor includes no C++ standard library header (only C headers such as
+  `<stddef.h>`), so it works with `-nostdinc++`, in kernels and on bare metal. CI enforces this by
+  compiling every header on its own with `-nostdinc++`.
+* **Optional STL interoperability (opt-in):** define `VAPOR_USE_STL=1` (CMake: `-DVAPOR_USE_STL=ON`)
+  to get conversion constructors and operators to native standard types (`std::string_view`,
+  `std::span`, `std::optional`, `std::expected`, `std::hash`) in modern C++ environments. Without it
+  those APIs simply do not exist, so nothing from the STL leaks in by accident.
+* **Strict warnings:** vapor's own tests and header checks build with `-Wall -Wextra -Wpedantic
+  -Wconversion -Wshadow -Wsign-conversion -Werror` (`/W4` on MSVC, reported but not fatal). Turn this off with
+  `-DVAPOR_WARNINGS_AS_ERRORS=OFF`, for example when testing with a compiler newer than the ones we track.
 * **Priority Overrides:** Gives your compiler definitions final say over CMake options via robust conditional preprocessing.
 
 ## Integration
@@ -97,3 +105,59 @@ Small building blocks that avoid pulling in `<utility>`, `<tuple>`, `<algorithm>
   Combine sets with `&`, `|`, `^`, `~`, shift them, and walk set bits with `FindFirst()` /
   `FindNext(pos)`. Positions at or past `N` abort; `checked_test(pos)` returns an `Expected`
   instead.
+
+## Bits, hashing, iterators, heaps, atomics and variants
+
+More STL-free building blocks. All of them allocate nothing except `PriorityQueue`, whose
+`push`/`emplace` can fail and so return an `Expected` (like `Vector`).
+
+* **Bit utilities** (`bit.hpp`): `PopCount` (how many bits are 1), `CountTrailingZeros`,
+  `CountLeadingZeros`, `BitWidth`, `IsPowerOfTwo`, `BitFloor`/`BitCeil` (round down/up to a power
+  of two; `BitCeil` returns 0 on overflow instead of being undefined), `RotateLeft`/`RotateRight`,
+  `ByteSwap` (flip endianness, for example when reading network data) and `BitCast<To>(from)`
+  (reinterpret the bytes of one type as another without undefined behaviour). They map to CPU
+  instructions through compiler builtins and fall back to portable code elsewhere.
+* **`Hash<T>` and comparators** (`hash.hpp`, `comparators.hpp`): `Hash` turns a key into a
+  `size_t` that a hash table can use to pick a bucket. Provided for integers, enums, floating
+  point, pointers, `StringView` and `String`; specialise it for your own key types and combine
+  fields with `HashCombine`. These hashes spread bits well but are **not cryptographic**: never
+  use them where an attacker chooses the keys. `Less`, `Greater`, `EqualTo`, ... are the usual
+  comparison function objects; `Less<>` compares mixed types without conversions.
+* **Iterator helpers** (`iterator.hpp`): `Distance`, `Advance`, `Next`, `Prev`, plus
+  `for (auto &x : Reversed(vec))` to walk backwards and `for (auto e : Enumerate(vec))` to get
+  `e.index` and `e.value` in one loop. They keep a reference to the container, so do not pass a
+  temporary.
+* **`BitView`** (`bit_view.hpp`) treats a byte buffer you already own (a flags field, a
+  protocol header, a hardware register image) as an array of bits without copying it. Bit `i` is
+  bit `i % 8` (from the least significant) of byte `i / 8` on every platform. `ConstBitView` is the
+  read-only form. Use `Bitset<N>` instead when you want an object that owns its bits.
+* **Heap algorithms and `PriorityQueue`** (`algorithm.hpp`, `priority_queue.hpp`): a heap keeps
+  the "largest" element at the front of an array, so inserting and removing the best element is
+  O(log n). `MakeHeap`, `PushHeap`, `PopHeap`, `SortHeap`, `IsHeap` work on any random-access
+  range. `PriorityQueue<T>` wraps a `Vector` for the common case: `push` / `top` / `pop`, largest
+  first, or `PriorityQueue<T, Greater<T>>` for smallest first (schedulers, timers, shortest-path
+  searches). `top()` and `pop()` abort on an empty queue; `checked_top()` returns an `Expected`.
+* **`Atomic<T>`** (`atomic.hpp`) is a variable that several threads may use without a data race.
+  `counter.fetch_add(1)`, `compare_exchange_strong(expected, desired)` (store only if the value
+  is still what you expect; otherwise `expected` is updated) and `load`/`store` take a
+  `MemoryOrder`. The default, `SeqCst`, is the safest; use `Acquire`/`Release` to pass data
+  between threads and `Relaxed` for plain counters. GCC and Clang use `__atomic_*` builtins.
+  MSVC uses `_Interlocked*` (4- and 8-byte types, always full ordering) and has not been tested.
+* **`Variant<A, B, ...>`** (`variant.hpp`) holds exactly one value out of several types and
+  remembers which, so protocols, parsers and state machines need no hand-written tagged union.
+  Read it with `GetIf<T>(&v)` (a pointer, or `nullptr`), `Get<T>(v)` (aborts if another
+  alternative is active, instead of throwing) or `Visit(visitor, v)`. Because there are no
+  exceptions a `Variant` is never "valueless": it starts as the first alternative, so put
+  `Monostate` first when that type has no default constructor.
+
+## Building and testing
+
+```sh
+cmake -S . -B build && cmake --build build && ctest --test-dir build
+```
+
+The tests are built for C++11, 14, 17, 23 and 26. On GCC and Clang they use
+`-Wall -Wextra -Wpedantic -Wconversion -Wshadow -Wsign-conversion -Werror`. A separate
+`header_check_cppNN` target compiles every public header on its own with `-nostdinc++`, which
+proves each header is self-contained and includes no C++ standard library header.
+The tests themselves enable `VAPOR_USE_STL=1` to cover the optional interoperability layer.

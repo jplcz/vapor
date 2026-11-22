@@ -23,7 +23,7 @@ namespace vapor {
 
 enum class SpanError { OutOfBounds, EmptySpan };
 
-template <typename T> class VAPOR_NODISCARD Span {
+template <typename T> class VAPOR_NODISCARD_TYPE Span {
 public:
   typedef T value_type;
   typedef T *pointer;
@@ -35,7 +35,7 @@ public:
   typedef T *iterator;
   typedef const T *const_iterator;
 
-  static VAPOR_CXX14_CONSTEXPR inline size_type npos = size_type(-1);
+  static constexpr size_type npos = size_type(-1);
 
 private:
   pointer m_data;
@@ -46,7 +46,7 @@ public:
   VAPOR_CXX14_CONSTEXPR Span(pointer ptr, size_type count)
       : m_data(ptr), m_length(count) {}
   VAPOR_CXX14_CONSTEXPR Span(pointer first, pointer last)
-      : m_data(first), m_length(last - first) {}
+      : m_data(first), m_length(static_cast<size_type>(last - first)) {}
 
   template <size_type N>
   VAPOR_CXX14_CONSTEXPR Span(T (&arr)[N]) noexcept : m_data(arr), m_length(N) {}
@@ -234,6 +234,10 @@ public:
     return Span(m_data + (m_length - count), count);
   }
 };
+
+#if __cplusplus < 201703L
+template <typename T> constexpr typename Span<T>::size_type Span<T>::npos;
+#endif
 
 #if __cplusplus >= 201703L
 

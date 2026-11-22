@@ -1,6 +1,7 @@
 #pragma once
 #include <assert.h>
 #include <vapor/common.hpp>
+#include <vapor/detail/placement_new.hpp>
 #include <vapor/detail/storage.hpp>
 #include <vapor/expected.hpp>
 #include <vapor/reference_wrapper.hpp>
@@ -21,7 +22,7 @@ constexpr NullOptT NullOpt{0};
 // A value that may or may not be present. Unlike Expected it carries no error
 // code; use it when "absent" is a normal answer (e.g. a lookup that finds
 // nothing). Never allocates.
-template <typename T> class VAPOR_NODISCARD Optional {
+template <typename T> class VAPOR_NODISCARD_TYPE Optional {
   static_assert(!IsReference<T>::value,
                 "Optional<T&> is not supported; use ReferenceWrapper<T>");
 
@@ -186,15 +187,13 @@ public:
 };
 
 template <typename T>
-VAPOR_NODISCARD bool operator==(const Optional<T> &a,
-                                const Optional<T> &b) {
+VAPOR_NODISCARD bool operator==(const Optional<T> &a, const Optional<T> &b) {
   if (a.has_value() != b.has_value())
     return false;
   return !a.has_value() || *a == *b;
 }
 template <typename T>
-VAPOR_NODISCARD bool operator!=(const Optional<T> &a,
-                                const Optional<T> &b) {
+VAPOR_NODISCARD bool operator!=(const Optional<T> &a, const Optional<T> &b) {
   return !(a == b);
 }
 template <typename T>

@@ -17,12 +17,24 @@ target_include_directories(vapor INTERFACE
         $<INSTALL_INTERFACE:include>
 )
 
-option(VAPOR_USE_STL "Enable STL features and interoperability for vapor" ON)
+option(VAPOR_USE_STL "Opt in to interoperability with the C++ standard library (off by default: vapor includes no STL header)" OFF)
+option(VAPOR_WARNINGS_AS_ERRORS "Compile vapor's own tests and header checks with strict warnings as errors" ON)
 option(VAPOR_BUILD_TESTS "Build test suites for vapor" ${VAPOR_IS_TOP_LEVEL})
 option(VAPOR_ENABLE_INSTALL "Generate installation rules for vapor" ${VAPOR_IS_TOP_LEVEL})
 
-if(NOT VAPOR_USE_STL)
-    target_compile_definitions(vapor INTERFACE VAPOR_NO_STL)
+if(VAPOR_USE_STL)
+    target_compile_definitions(vapor INTERFACE VAPOR_USE_STL=1)
+endif()
+
+# Strict warnings for vapor's own code. Not exported to users of the library.
+if(MSVC)
+    # /WX is not added: MSVC warnings are reported but do not fail the build.
+    set(VAPOR_STRICT_WARNINGS /W4)
+else()
+    set(VAPOR_STRICT_WARNINGS -Wall -Wextra -Wpedantic -Wconversion -Wshadow -Wsign-conversion)
+    if(VAPOR_WARNINGS_AS_ERRORS)
+        list(APPEND VAPOR_STRICT_WARNINGS -Werror)
+    endif()
 endif()
 
 if(VAPOR_BUILD_TESTS)

@@ -90,8 +90,7 @@ template <typename T> struct RemovePointer<T *> {
 template <typename T> struct RemovePointer<T *const> {
   using type = T;
 };
-template <typename T>
-using RemovePointerT = typename RemovePointer<T>::type;
+template <typename T> using RemovePointerT = typename RemovePointer<T>::type;
 
 namespace detail {
 template <typename...> struct MakeVoid {
@@ -127,9 +126,8 @@ template <typename T> struct IsLvalueReference<T &> : TrueType {};
 template <typename T> struct IsRvalueReference : FalseType {};
 template <typename T> struct IsRvalueReference<T &&> : TrueType {};
 template <typename T>
-struct IsReference
-    : IntegralConstant<bool, IsLvalueReference<T>::value ||
-                                 IsRvalueReference<T>::value> {};
+struct IsReference : IntegralConstant<bool, IsLvalueReference<T>::value ||
+                                                IsRvalueReference<T>::value> {};
 
 template <typename T> struct IsConst : FalseType {};
 template <typename T> struct IsConst<const T> : TrueType {};
@@ -182,8 +180,7 @@ template <typename T> using DecayT = typename Decay<T>::type;
 
 #ifdef VAPOR_HAS_TYPE_INTRINSICS
 #define VAPOR_TRAIT_1(Name, Intrinsic)                                         \
-  template <typename T>                                                        \
-  struct Name : IntegralConstant<bool, Intrinsic(T)> {}
+  template <typename T> struct Name : IntegralConstant<bool, Intrinsic(T)> {}
 
 // Layout / lifetime properties
 VAPOR_TRAIT_1(IsTriviallyCopyable, __is_trivially_copyable);
@@ -234,13 +231,13 @@ template <typename T> using UnderlyingTypeT = typename UnderlyingType<T>::type;
 
 namespace detail {
 template <typename From, typename To>
-auto IsConvertibleTest(int) -> decltype(
-    static_cast<void (*)(To)>(nullptr)(Declval<From>()), TrueType());
+auto IsConvertibleTest(int)
+    -> decltype(static_cast<void (*)(To)>(nullptr)(Declval<From>()),
+                TrueType());
 template <typename From, typename To> FalseType IsConvertibleTest(...);
 
 template <typename T, typename... Args>
-auto IsConstructibleTest(int)
-    -> decltype(T(Declval<Args>()...), TrueType());
+auto IsConstructibleTest(int) -> decltype(T(Declval<Args>()...), TrueType());
 template <typename T, typename... Args> FalseType IsConstructibleTest(...);
 } // namespace detail
 
@@ -248,11 +245,82 @@ template <typename From, typename To>
 struct IsConvertible : decltype(detail::IsConvertibleTest<From, To>(0)) {};
 
 template <typename T, typename... Args>
-struct IsConstructible
-    : decltype(detail::IsConstructibleTest<T, Args...>(0)) {};
+struct IsConstructible : decltype(detail::IsConstructibleTest<T, Args...>(0)) {
+};
 
 template <typename T>
 struct IsNothrowMoveConstructible
     : IntegralConstant<bool, noexcept(T(Declval<T>()))> {};
+
+template <typename T>
+struct IsCopyConstructible : IsConstructible<T, const T &> {};
+
+namespace detail {
+template <typename T> struct IsIntegralBase : FalseType {};
+#define VAPOR_INTEGRAL(T)                                                      \
+  template <> struct IsIntegralBase<T> : TrueType {}
+VAPOR_INTEGRAL(bool);
+VAPOR_INTEGRAL(char);
+VAPOR_INTEGRAL(signed char);
+VAPOR_INTEGRAL(unsigned char);
+VAPOR_INTEGRAL(wchar_t);
+VAPOR_INTEGRAL(char16_t);
+VAPOR_INTEGRAL(char32_t);
+VAPOR_INTEGRAL(short);
+VAPOR_INTEGRAL(unsigned short);
+VAPOR_INTEGRAL(int);
+VAPOR_INTEGRAL(unsigned int);
+VAPOR_INTEGRAL(long);
+VAPOR_INTEGRAL(unsigned long);
+VAPOR_INTEGRAL(long long);
+VAPOR_INTEGRAL(unsigned long long);
+#if defined(__cpp_char8_t)
+VAPOR_INTEGRAL(char8_t);
+#endif
+#undef VAPOR_INTEGRAL
+
+template <typename T> struct IsFloatingBase : FalseType {};
+template <> struct IsFloatingBase<float> : TrueType {};
+template <> struct IsFloatingBase<double> : TrueType {};
+template <> struct IsFloatingBase<long double> : TrueType {};
+} // namespace detail
+
+template <typename T>
+struct IsIntegral : detail::IsIntegralBase<RemoveCVT<T>> {};
+template <typename T>
+struct IsFloatingPoint : detail::IsFloatingBase<RemoveCVT<T>> {};
+template <typename T>
+struct IsArithmetic : IntegralConstant<bool, IsIntegral<T>::value ||
+                                                 IsFloatingPoint<T>::value> {};
+template <typename T>
+struct IsNullPointer : IsSame<RemoveCVT<T>, decltype(nullptr)> {};
+
+namespace detail {
+template <typename T, bool = IsArithmetic<T>::value>
+struct IsSignedBase : FalseType {};
+template <typename T>
+struct IsSignedBase<T, true> : IntegralConstant<bool, T(-1) < T(0)> {};
+template <typename T, bool = IsArithmetic<T>::value>
+struct IsUnsignedBase : FalseType {};
+template <typename T>
+struct IsUnsignedBase<T, true> : IntegralConstant<bool, T(0) < T(-1)> {};
+} // namespace detail
+
+template <typename T> struct IsSigned : detail::IsSignedBase<T> {};
+template <typename T> struct IsUnsigned : detail::IsUnsignedBase<T> {};
+
+// The unsigned integer type with the same size as T (T integral or enum).
+// Useful for bit manipulation without worrying about sign.
+template <typename T> struct MakeUnsigned {
+  static_assert(sizeof(T) == 1 || sizeof(T) == 2 || sizeof(T) == 4 ||
+                    sizeof(T) == 8,
+                "MakeUnsigned supports 1, 2, 4 and 8 byte types");
+  typedef ConditionalT<sizeof(T) == 1, unsigned char,
+                       ConditionalT<sizeof(T) == 2, unsigned short,
+                                    ConditionalT<sizeof(T) == 4, unsigned int,
+                                                 unsigned long long>>>
+      type;
+};
+template <typename T> using MakeUnsignedT = typename MakeUnsigned<T>::type;
 
 } // namespace vapor

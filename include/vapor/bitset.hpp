@@ -2,6 +2,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <vapor/bit.hpp>
 #include <vapor/common.hpp>
 #include <vapor/config.hpp>
 #include <vapor/expected.hpp>
@@ -15,40 +16,11 @@
 //
 // How: `Bitset<100> b; b.set(3); b.test(3); b.count(); b |= other;`.
 // `FindFirst()` / `FindNext(pos)` walk the set bits quickly; they return `N`
-// when there is none. Deviations from std::bitset (which throws): test(), set(),
-// reset(), flip() abort on a position >= N; `checked_test(pos)` returns an
-// `Expected` instead. There is no string conversion.
+// when there is none. Deviations from std::bitset (which throws): test(),
+// set(), reset(), flip() abort on a position >= N; `checked_test(pos)` returns
+// an `Expected` instead. There is no string conversion.
 
 namespace vapor {
-
-namespace detail {
-
-inline size_t PopCount64(uint64_t v) noexcept {
-#if defined(__GNUC__) || defined(__clang__)
-  return static_cast<size_t>(__builtin_popcountll(v));
-#else
-  size_t n = 0;
-  for (; v; v &= v - 1)
-    ++n;
-  return n;
-#endif
-}
-
-// Index of the lowest set bit; v must be non-zero.
-inline size_t CountTrailingZeros64(uint64_t v) noexcept {
-#if defined(__GNUC__) || defined(__clang__)
-  return static_cast<size_t>(__builtin_ctzll(v));
-#else
-  size_t n = 0;
-  while (!(v & 1)) {
-    v >>= 1;
-    ++n;
-  }
-  return n;
-#endif
-}
-
-} // namespace detail
 
 template <size_t N> class Bitset {
   static constexpr size_t kWordBits = 64;
@@ -103,8 +75,8 @@ public:
     CheckPos(pos);
     return (m_words[pos / kWordBits] >> (pos % kWordBits)) & 1;
   }
-  VAPOR_NODISCARD Expected<bool, CommonError> checked_test(size_t pos) const
-      noexcept {
+  VAPOR_NODISCARD Expected<bool, CommonError>
+  checked_test(size_t pos) const noexcept {
     if (pos >= N)
       return MakeUnexpected(CommonError::OutOfBounds);
     return test(pos);
@@ -151,7 +123,7 @@ public:
   VAPOR_NODISCARD size_t count() const noexcept {
     size_t n = 0;
     for (size_t i = 0; i < kWords; ++i)
-      n += detail::PopCount64(m_words[i]);
+      n += static_cast<size_t>(PopCount(m_words[i]));
     return n;
   }
   VAPOR_NODISCARD bool any() const noexcept {
@@ -271,7 +243,7 @@ private:
     uint64_t cur = m_words[w] & (~uint64_t(0) << (pos % kWordBits));
     for (;;) {
       if (cur)
-        return w * kWordBits + detail::CountTrailingZeros64(cur);
+        return w * kWordBits + static_cast<size_t>(CountTrailingZeros(cur));
       if (++w >= kWords)
         return N;
       cur = m_words[w];
@@ -286,8 +258,8 @@ public:
   explicit Bitset(unsigned long long) noexcept {}
   VAPOR_NODISCARD constexpr size_t size() const noexcept { return 0; }
   VAPOR_NODISCARD bool test(size_t) const { abort(); }
-  VAPOR_NODISCARD Expected<bool, CommonError> checked_test(size_t) const
-      noexcept {
+  VAPOR_NODISCARD Expected<bool, CommonError>
+  checked_test(size_t) const noexcept {
     return MakeUnexpected(CommonError::OutOfBounds);
   }
   Bitset &set() noexcept { return *this; }

@@ -13,7 +13,7 @@
 
 namespace vapor {
 
-class VAPOR_NODISCARD String {
+class VAPOR_NODISCARD_TYPE String {
 public:
   typedef char value_type;
   typedef char *pointer;
@@ -183,7 +183,8 @@ public:
 
     // sv may point into our own buffer, which reserve() can move; keep it as
     // an offset so it stays valid.
-    bool aliased = m_data && sv.data() >= m_data && sv.data() < m_data + m_length;
+    bool aliased =
+        m_data && sv.data() >= m_data && sv.data() < m_data + m_length;
     size_type offset = aliased ? static_cast<size_type>(sv.data() - m_data) : 0;
 
     if (required_capacity > m_capacity) {
@@ -250,7 +251,7 @@ public:
   }
 
   VAPOR_NODISCARD
-  VAPOR_CXX20_CONSTEXPR Expected<ReferenceWrapper<char>, CommonError>
+  Expected<ReferenceWrapper<char>, CommonError>
   checked_at(size_type pos) & noexcept {
     if (pos >= m_length)
       return MakeUnexpected(CommonError::OutOfBounds);
@@ -258,7 +259,7 @@ public:
   }
 
   VAPOR_NODISCARD
-  VAPOR_CXX20_CONSTEXPR Expected<ReferenceWrapper<const char>, CommonError>
+  Expected<ReferenceWrapper<const char>, CommonError>
   checked_at(size_type pos) const & noexcept {
     if (pos >= m_length)
       return MakeUnexpected(CommonError::OutOfBounds);
@@ -280,8 +281,8 @@ inline int CompareBytes(const char *a, size_t an, const char *b,
 
 VAPOR_NODISCARD inline bool operator==(const String &lhs,
                                        const String &rhs) noexcept {
-  return detail::CompareBytes(lhs.data(), lhs.size(), rhs.data(),
-                              rhs.size()) == 0;
+  return detail::CompareBytes(lhs.data(), lhs.size(), rhs.data(), rhs.size()) ==
+         0;
 }
 
 VAPOR_NODISCARD inline bool operator!=(const String &lhs,
@@ -291,7 +292,8 @@ VAPOR_NODISCARD inline bool operator!=(const String &lhs,
 
 VAPOR_NODISCARD inline bool operator<(const String &lhs,
                                       const String &rhs) noexcept {
-  return detail::CompareBytes(lhs.data(), lhs.size(), rhs.data(), rhs.size()) < 0;
+  return detail::CompareBytes(lhs.data(), lhs.size(), rhs.data(), rhs.size()) <
+         0;
 }
 VAPOR_NODISCARD inline bool operator<=(const String &lhs,
                                        const String &rhs) noexcept {
@@ -308,8 +310,8 @@ VAPOR_NODISCARD inline bool operator>=(const String &lhs,
 
 VAPOR_NODISCARD inline bool operator==(const String &lhs,
                                        StringView rhs) noexcept {
-  return detail::CompareBytes(lhs.data(), lhs.size(), rhs.data(),
-                              rhs.size()) == 0;
+  return detail::CompareBytes(lhs.data(), lhs.size(), rhs.data(), rhs.size()) ==
+         0;
 }
 
 VAPOR_NODISCARD inline bool operator==(StringView lhs,
@@ -327,14 +329,14 @@ VAPOR_NODISCARD inline bool operator!=(StringView lhs,
 
 VAPOR_NODISCARD inline bool operator<(const String &lhs,
                                       StringView rhs) noexcept {
-  return detail::CompareBytes(lhs.data(), lhs.size(), rhs.data(),
-                              rhs.size()) < 0;
+  return detail::CompareBytes(lhs.data(), lhs.size(), rhs.data(), rhs.size()) <
+         0;
 }
 
 VAPOR_NODISCARD inline bool operator<(StringView lhs,
                                       const String &rhs) noexcept {
-  return detail::CompareBytes(lhs.data(), lhs.size(), rhs.data(),
-                              rhs.size()) < 0;
+  return detail::CompareBytes(lhs.data(), lhs.size(), rhs.data(), rhs.size()) <
+         0;
 }
 VAPOR_NODISCARD inline bool operator<=(const String &lhs,
                                        StringView rhs) noexcept {

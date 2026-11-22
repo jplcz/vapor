@@ -1,6 +1,7 @@
 #pragma once
 #include <assert.h>
 #include <vapor/config.hpp>
+#include <vapor/detail/placement_new.hpp>
 #include <vapor/utility.hpp>
 
 #if defined(VAPOR_USE_STL) && (__cplusplus >= 202002L)
@@ -16,7 +17,7 @@
 #endif
 
 namespace vapor {
-template <typename E> struct VAPOR_NODISCARD Unexpected {
+template <typename E> struct VAPOR_NODISCARD_TYPE Unexpected {
   E error;
 
   VAPOR_CXX14_CONSTEXPR explicit Unexpected(E err) : error(Move(err)) {}
@@ -27,7 +28,7 @@ VAPOR_NODISCARD VAPOR_CXX14_CONSTEXPR Unexpected<E> MakeUnexpected(E err) {
   return Unexpected<E>(Move(err));
 }
 
-template <typename T, typename E> class VAPOR_NODISCARD Expected {
+template <typename T, typename E> class VAPOR_NODISCARD_TYPE Expected {
 private:
   union {
     T m_value;
@@ -228,7 +229,7 @@ public:
   }
 };
 
-template <typename E> class VAPOR_NODISCARD Expected<void, E> {
+template <typename E> class VAPOR_NODISCARD_TYPE Expected<void, E> {
 private:
   struct empty {};
 

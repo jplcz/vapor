@@ -4,8 +4,8 @@
 #include <gtest/gtest.h>
 
 using vapor::Vector;
-using vapor_test::Tracked;
 using vapor_test::TestAllocator;
+using vapor_test::Tracked;
 
 TEST(VectorTest, PushBackGrowsAndKeepsOrder) {
   TestAllocator alloc;
@@ -16,7 +16,7 @@ TEST(VectorTest, PushBackGrowsAndKeepsOrder) {
     EXPECT_EQ(v.size(), 100U);
     EXPECT_GE(v.capacity(), 100U);
     for (int i = 0; i < 100; ++i)
-      EXPECT_EQ(v[i], i);
+      EXPECT_EQ(v[static_cast<size_t>(i)], i);
     EXPECT_EQ(v.front(), 0);
     EXPECT_EQ(v.back(), 99);
   }
@@ -50,7 +50,7 @@ TEST(VectorTest, NonTrivialElementsAreMovedAndDestroyed) {
       ASSERT_TRUE(v.emplace_back(i));
     EXPECT_EQ(Tracked::alive, 20);
     for (int i = 0; i < 20; ++i)
-      EXPECT_EQ(v[i].value, i);
+      EXPECT_EQ(v[static_cast<size_t>(i)].value, i);
     v.pop_back();
     EXPECT_EQ(Tracked::alive, 19);
     v.clear();

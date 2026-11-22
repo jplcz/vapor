@@ -37,7 +37,7 @@ TEST(InlineVectorTest, LifetimesAreBalanced) {
     ASSERT_TRUE(v.insert(v.begin(), v[3])); // aliasing insert
     EXPECT_EQ(v[0].value, 3);
     v.pop_back();
-    v.resize(2);
+    ASSERT_TRUE(v.resize(2).has_value());
     EXPECT_EQ(Tracked::alive, 2);
   }
   EXPECT_EQ(Tracked::alive, 0);

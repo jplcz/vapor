@@ -17,7 +17,15 @@
 
 namespace vapor {
 
-struct VAPOR_NODISCARD StringView {
+namespace detail {
+// Holds npos so it has a definition in C++11/14 without a .cpp file.
+template <typename Unused = void> struct StringViewNpos {
+  static constexpr size_t npos = static_cast<size_t>(-1);
+};
+template <typename Unused> constexpr size_t StringViewNpos<Unused>::npos;
+} // namespace detail
+
+struct VAPOR_NODISCARD_TYPE StringView : detail::StringViewNpos<> {
   typedef char value_type;
   typedef char *pointer;
   typedef const char *const_pointer;
@@ -26,7 +34,7 @@ struct VAPOR_NODISCARD StringView {
   typedef size_t size_type;
   typedef ptrdiff_t difference_type;
   typedef const char *const_iterator;
-  static VAPOR_CXX14_CONSTEXPR inline size_type npos = size_type(-1);
+  using detail::StringViewNpos<>::npos;
 
   const char *m_string;
   size_t m_length;
@@ -219,7 +227,7 @@ struct VAPOR_NODISCARD StringView {
 
   // --- Checked Character Queries ---
 
-  VAPOR_NODISCARD VAPOR_CXX20_CONSTEXPR Expected<size_type, CommonError>
+  VAPOR_NODISCARD Expected<size_type, CommonError>
   checked_find(char c, size_type pos = 0) const noexcept {
     if (pos >= m_length) {
       return MakeUnexpected(CommonError::OutOfBounds);
@@ -231,7 +239,7 @@ struct VAPOR_NODISCARD StringView {
     return MakeUnexpected(CommonError::ValueNotFound);
   }
 
-  VAPOR_NODISCARD VAPOR_CXX20_CONSTEXPR Expected<size_type, CommonError>
+  VAPOR_NODISCARD Expected<size_type, CommonError>
   checked_find(StringView sv, size_type pos = 0) const noexcept {
     if (pos + sv.size() > m_length) {
       return MakeUnexpected(CommonError::OutOfBounds);
@@ -256,7 +264,7 @@ struct VAPOR_NODISCARD StringView {
   // --- Checked Element Access ---
 
   VAPOR_NODISCARD
-  VAPOR_CXX20_CONSTEXPR Expected<ReferenceWrapper<const char>, CommonError>
+  Expected<ReferenceWrapper<const char>, CommonError>
   checked_at(size_type pos) const noexcept {
     if (pos >= m_length) {
       return MakeUnexpected(CommonError::OutOfBounds);
@@ -266,7 +274,7 @@ struct VAPOR_NODISCARD StringView {
   }
 
   VAPOR_NODISCARD
-  VAPOR_CXX20_CONSTEXPR Expected<ReferenceWrapper<const char>, CommonError>
+  Expected<ReferenceWrapper<const char>, CommonError>
   checked_front() const noexcept {
     if (empty()) {
       return MakeUnexpected(CommonError::EmptyString);
@@ -275,7 +283,7 @@ struct VAPOR_NODISCARD StringView {
   }
 
   VAPOR_NODISCARD
-  VAPOR_CXX20_CONSTEXPR Expected<ReferenceWrapper<const char>, CommonError>
+  Expected<ReferenceWrapper<const char>, CommonError>
   checked_back() const noexcept {
     if (empty()) {
       return MakeUnexpected(CommonError::EmptyString);
@@ -285,7 +293,7 @@ struct VAPOR_NODISCARD StringView {
 
   // --- Checked Trimming & Slicing ---
 
-  VAPOR_NODISCARD VAPOR_CXX20_CONSTEXPR Expected<StringView, CommonError>
+  VAPOR_NODISCARD Expected<StringView, CommonError>
   checked_remove_prefix(size_type n) const noexcept {
     if (n > m_length) {
       return MakeUnexpected(CommonError::OutOfBounds);
@@ -293,7 +301,7 @@ struct VAPOR_NODISCARD StringView {
     return StringView(m_string + n, m_length - n);
   }
 
-  VAPOR_NODISCARD VAPOR_CXX20_CONSTEXPR Expected<StringView, CommonError>
+  VAPOR_NODISCARD Expected<StringView, CommonError>
   checked_remove_suffix(size_type n) const noexcept {
     if (n > m_length) {
       return MakeUnexpected(CommonError::OutOfBounds);
@@ -303,7 +311,7 @@ struct VAPOR_NODISCARD StringView {
 
   // --- Checked Tokenization / Splitting ---
 
-  VAPOR_NODISCARD VAPOR_CXX20_CONSTEXPR Expected<StringView, CommonError>
+  VAPOR_NODISCARD Expected<StringView, CommonError>
   checked_split_by(char delimiter) const noexcept {
     if (empty()) {
       return MakeUnexpected(CommonError::EmptyString);

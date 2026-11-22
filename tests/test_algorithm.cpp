@@ -154,11 +154,21 @@ TEST(AlgorithmTest, SortMatchesReferenceOnManyShapes) {
       for (size_t i = 0; i < n; ++i) {
         int val = 0;
         switch (shape) {
-        case 0: val = static_cast<int>(Rand() % 1000); break; // random
-        case 1: val = static_cast<int>(i); break;              // sorted
-        case 2: val = static_cast<int>(n - i); break;          // reversed
-        case 3: val = static_cast<int>(Rand() % 3); break;     // few distinct
-        case 4: val = 7; break;                                // all equal
+        case 0:
+          val = static_cast<int>(Rand() % 1000);
+          break; // random
+        case 1:
+          val = static_cast<int>(i);
+          break; // sorted
+        case 2:
+          val = static_cast<int>(n - i);
+          break; // reversed
+        case 3:
+          val = static_cast<int>(Rand() % 3);
+          break; // few distinct
+        case 4:
+          val = 7;
+          break; // all equal
         }
         ASSERT_TRUE(v.push_back(val));
       }
@@ -203,13 +213,14 @@ TEST(AlgorithmTest, StableSortKeepsEqualKeysInOrder) {
   for (size_t n : {5u, 8u, 9u, 64u, 500u, 3000u}) {
     va::Vector<Item> v;
     for (size_t i = 0; i < n; ++i)
-      ASSERT_TRUE(v.push_back(Item{static_cast<int>(Rand() % 10),
-                                   static_cast<int>(i)}));
+      ASSERT_TRUE(v.push_back(
+          Item{static_cast<int>(Rand() % 10), static_cast<int>(i)}));
     va::StableSort(v, ByKey);
     for (size_t i = 1; i < v.size(); ++i) {
       ASSERT_LE(v[i - 1].key, v[i].key);
-      if (v[i - 1].key == v[i].key)
+      if (v[i - 1].key == v[i].key) {
         ASSERT_LT(v[i - 1].order, v[i].order) << "n=" << n;
+      }
     }
   }
 }

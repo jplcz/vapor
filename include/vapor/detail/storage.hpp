@@ -4,6 +4,7 @@
 #include <string.h>
 #include <vapor/allocator.hpp>
 #include <vapor/config.hpp>
+#include <vapor/detail/placement_new.hpp>
 #include <vapor/type_traits.hpp>
 #include <vapor/utility.hpp>
 
@@ -67,8 +68,7 @@ inline void MoveConstructRange(T *dst, T *src, size_t n, FalseType) {
   for (size_t i = 0; i < n; ++i)
     ::new (static_cast<void *>(dst + i)) T(Move(src[i]));
 }
-template <typename T>
-inline void MoveConstructRange(T *dst, T *src, size_t n) {
+template <typename T> inline void MoveConstructRange(T *dst, T *src, size_t n) {
   MoveConstructRange(dst, src, n,
                      IntegralConstant<bool, IsTriviallyCopyable<T>::value>());
 }
@@ -79,8 +79,8 @@ template <typename T>
 inline void MoveAssignBackward(T *first, T *last, T *dst_last, TrueType) {
   size_t n = static_cast<size_t>(last - first);
   if (n)
-    ::memmove(static_cast<void *>(dst_last - n), static_cast<const void *>(first),
-              n * sizeof(T));
+    ::memmove(static_cast<void *>(dst_last - n),
+              static_cast<const void *>(first), n * sizeof(T));
 }
 template <typename T>
 inline void MoveAssignBackward(T *first, T *last, T *dst_last, FalseType) {
@@ -107,8 +107,7 @@ inline void MoveAssignForward(T *first, T *last, T *dst, FalseType) {
   while (first != last)
     *dst++ = Move(*first++);
 }
-template <typename T>
-inline void MoveAssignForward(T *first, T *last, T *dst) {
+template <typename T> inline void MoveAssignForward(T *first, T *last, T *dst) {
   MoveAssignForward(first, last, dst,
                     IntegralConstant<bool, IsTriviallyCopyable<T>::value>());
 }
