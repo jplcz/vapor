@@ -51,4 +51,22 @@ VAPOR_CXX14_CONSTEXPR T Exchange(T &obj, U &&new_value) {
   return old;
 }
 
+// A compile-time list of indices, used to expand a parameter pack alongside
+// the elements of a Tuple. MakeIndexSequence<3> is IndexSequence<0, 1, 2>.
+template <size_t... Is> struct IndexSequence {
+  typedef IndexSequence type;
+  static constexpr size_t size() noexcept { return sizeof...(Is); }
+};
+
+namespace detail {
+template <size_t N, size_t... Is>
+struct MakeIndexSequenceImpl : MakeIndexSequenceImpl<N - 1, N - 1, Is...> {};
+template <size_t... Is> struct MakeIndexSequenceImpl<0, Is...> {
+  typedef IndexSequence<Is...> type;
+};
+} // namespace detail
+
+template <size_t N>
+using MakeIndexSequence = typename detail::MakeIndexSequenceImpl<N>::type;
+
 } // namespace vapor

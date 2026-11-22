@@ -90,6 +90,8 @@ template <typename T> struct RemovePointer<T *> {
 template <typename T> struct RemovePointer<T *const> {
   using type = T;
 };
+template <typename T>
+using RemovePointerT = typename RemovePointer<T>::type;
 
 namespace detail {
 template <typename...> struct MakeVoid {

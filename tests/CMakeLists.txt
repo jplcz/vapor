@@ -23,7 +23,16 @@ foreach (STD ${CPP_STANDARDS})
                 test_string.cpp
                 test_functional.cpp
                 test_type_traits.cpp
-                test_hardening.cpp)
+                test_hardening.cpp
+                test_vector.cpp
+                test_inline_vector.cpp
+                test_array.cpp
+                test_optional.cpp
+                test_unique_ptr.cpp
+                test_tuple.cpp
+                test_function_ref.cpp
+                test_algorithm.cpp
+                test_bitset.cpp)
 
         target_compile_features(${TEST_TARGET} PRIVATE cxx_std_${STD})
 
