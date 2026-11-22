@@ -287,8 +287,18 @@ if (!io.Open()) { /* e.g. UnsupportedOperation on non-POSIX platforms */ }
 * **Why the callbacks only report readiness.** You do the `read`/`write` yourself, so the loop does
   no hidden buffering and allocates nothing per event. Watching is *level-triggered*: while a
   descriptor stays ready the callback keeps firing, so read it or `Unwatch` it.
-* **Threads.** Callbacks run on the thread that calls `Run`. Only `Post` and `Stop` may be called
-  from other threads; `Post` wakes a sleeping loop through an internal pipe.
+* **Threads.** Every function may be called from any thread, and several threads may call `Run`
+  on the same scheduler to share the work (like Asio's `io_context::run`). Why: one slow callback
+  then does not stall everything, and handlers can use several CPU cores. One thread at a time
+  sleeps in the operating system; the others take ready work. A given watch or timer never runs
+  two callbacks at once (a repeating tick due while the previous one still runs is skipped);
+  different ones run in parallel, and posted tasks may overlap. While a watch's callback runs its
+  descriptor is taken out of the wait set and put back afterwards (still level-triggered for you;
+  if the callback closed the descriptor without `Unwatch`, the watch is dropped). `Unwatch` and
+  `Cancel` return immediately even when that callback is running elsewhere, so state it uses must
+  stay alive until it returns (a `SharedPtr` helps). The allocator you pass must be thread-safe
+  when several threads use the scheduler. Building with `-DVAPOR_IO_SINGLE_THREADED` removes all
+  locking; then every call, including `Post` and `Stop`, must come from the one loop thread.
 * **Safe re-entry.** Callbacks may `Post`, schedule, `Cancel` and `Unwatch` (even themselves). Ids
   are never reused, so a stale id just reports "not found". Repeating timers keep their rhythm
   (no drift) and skip ticks missed while the loop was busy.
