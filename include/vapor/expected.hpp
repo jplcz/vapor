@@ -19,12 +19,12 @@ namespace vapor {
 template <typename E> struct VAPOR_NODISCARD Unexpected {
   E error;
 
-  VAPOR_CXX14_CONSTEXPR explicit Unexpected(E err) : error(err) {}
+  VAPOR_CXX14_CONSTEXPR explicit Unexpected(E err) : error(Move(err)) {}
 };
 
 template <typename E>
 VAPOR_NODISCARD VAPOR_CXX14_CONSTEXPR Unexpected<E> MakeUnexpected(E err) {
-  return Unexpected<E>(err);
+  return Unexpected<E>(Move(err));
 }
 
 template <typename T, typename E> class VAPOR_NODISCARD Expected {
@@ -79,9 +79,9 @@ public:
   VAPOR_CXX14_CONSTEXPR Expected(Expected &&other) noexcept
       : m_has_value(other.m_has_value) {
     if (m_has_value) {
-      new (&m_value) T((other.m_value));
+      new (&m_value) T(Move(other.m_value));
     } else {
-      new (&m_error) E((other.m_error));
+      new (&m_error) E(Move(other.m_error));
     }
   }
 
@@ -103,9 +103,9 @@ public:
       destroy();
       m_has_value = other.m_has_value;
       if (m_has_value) {
-        new (&m_value) T((other.m_value));
+        new (&m_value) T(Move(other.m_value));
       } else {
-        new (&m_error) E((other.m_error));
+        new (&m_error) E(Move(other.m_error));
       }
     }
     return *this;
@@ -128,9 +128,9 @@ public:
   VAPOR_CXX14_CONSTEXPR Expected(std::expected<T, E> &&other)
       : m_has_value(other.has_value()) {
     if (m_has_value) {
-      new (&m_value) T((other.value()));
+      new (&m_value) T(Move(other.value()));
     } else {
-      new (&m_error) E((other.error()));
+      new (&m_error) E(Move(other.error()));
     }
   }
 
@@ -144,9 +144,9 @@ public:
 
   VAPOR_NODISCARD VAPOR_CXX14_CONSTEXPR operator std::expected<T, E>() && {
     if (m_has_value) {
-      return (m_value);
+      return Move(m_value);
     }
-    return std::unexpected<E>((m_error));
+    return std::unexpected<E>(Move(m_error));
   }
 #endif
 
@@ -173,18 +173,31 @@ public:
     return m_value;
   }
 
+  VAPOR_NODISCARD VAPOR_CXX14_CONSTEXPR const T &&value() const && {
+    assert(m_has_value);
+    return static_cast<const T &&>(m_value);
+  }
+
   VAPOR_NODISCARD VAPOR_CXX14_CONSTEXPR const T *operator->() const noexcept {
+    assert(m_has_value);
     return &m_value;
   }
   VAPOR_NODISCARD VAPOR_CXX14_CONSTEXPR T *operator->() noexcept {
+    assert(m_has_value);
     return &m_value;
   }
 
   VAPOR_NODISCARD VAPOR_CXX14_CONSTEXPR const T &operator*() const & noexcept {
+    assert(m_has_value);
     return m_value;
   }
   VAPOR_NODISCARD VAPOR_CXX14_CONSTEXPR T &operator*() & noexcept {
+    assert(m_has_value);
     return m_value;
+  }
+  VAPOR_NODISCARD VAPOR_CXX14_CONSTEXPR T &&operator*() && noexcept {
+    assert(m_has_value);
+    return Move(m_value);
   }
 
   VAPOR_NODISCARD VAPOR_CXX14_CONSTEXPR const E &error() const & {
@@ -197,9 +210,21 @@ public:
     return m_error;
   }
 
+  VAPOR_NODISCARD VAPOR_CXX14_CONSTEXPR E &&error() && {
+    assert(!m_has_value);
+    return Move(m_error);
+  }
+
   template <typename U>
   VAPOR_NODISCARD VAPOR_CXX14_CONSTEXPR T value_or(U &&default_value) const & {
-    return m_has_value ? m_value : static_cast<T>((default_value));
+    return m_has_value ? m_value : static_cast<T>(Forward<U>(default_value));
+  }
+
+  // Moves the value out of a temporary instead of copying it
+  template <typename U>
+  VAPOR_NODISCARD VAPOR_CXX14_CONSTEXPR T value_or(U &&default_value) && {
+    return m_has_value ? Move(m_value)
+                       : static_cast<T>(Forward<U>(default_value));
   }
 };
 
@@ -325,6 +350,11 @@ public:
   VAPOR_NODISCARD VAPOR_CXX14_CONSTEXPR E &error() & {
     assert(!m_has_value);
     return m_error;
+  }
+
+  VAPOR_NODISCARD VAPOR_CXX14_CONSTEXPR E &&error() && {
+    assert(!m_has_value);
+    return Move(m_error);
   }
 };
 

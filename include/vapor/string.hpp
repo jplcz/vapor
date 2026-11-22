@@ -139,7 +139,7 @@ public:
   VAPOR_NODISCARD Expected<String, CommonError> Clone() && noexcept {
     // The object is a temporary! Instead of deep copying,
     // we can cheaply cast ourselves to a mutable rvalue and move our data out.
-    return String(Move(*const_cast<String *>(this)));
+    return String(Move(*this));
   }
 
   Expected<void, CommonError> reserve(size_type new_capacity) noexcept {
@@ -177,7 +177,15 @@ public:
     if (sv.empty())
       return {};
 
+    if (sv.size() > VAPOR_SIZE_MAX - 1 - m_length)
+      return MakeUnexpected(CommonError::OutOfMemory);
     size_type required_capacity = m_length + sv.size();
+
+    // sv may point into our own buffer, which reserve() can move; keep it as
+    // an offset so it stays valid.
+    bool aliased = m_data && sv.data() >= m_data && sv.data() < m_data + m_length;
+    size_type offset = aliased ? static_cast<size_type>(sv.data() - m_data) : 0;
+
     if (required_capacity > m_capacity) {
       size_type new_cap = m_capacity == 0 ? 8 : m_capacity * 2;
       if (new_cap < required_capacity)
@@ -188,8 +196,8 @@ public:
         return MakeUnexpected(res.error());
     }
 
-    // Replaced character loop with hardware-accelerated block copy
-    ::memcpy(m_data + m_length, sv.data(), sv.size());
+    const char *src = aliased ? m_data + offset : sv.data();
+    ::memmove(m_data + m_length, src, sv.size());
 
     m_length += sv.size();
     m_data[m_length] = '\0';
@@ -258,11 +266,22 @@ public:
   }
 };
 
+namespace detail {
+// Length-aware three-way compare; unlike strcmp it handles embedded '\0'.
+inline int CompareBytes(const char *a, size_t an, const char *b,
+                        size_t bn) noexcept {
+  size_t n = an < bn ? an : bn;
+  int cmp = n ? ::memcmp(a, b, n) : 0;
+  if (cmp != 0)
+    return cmp;
+  return an < bn ? -1 : (an > bn ? 1 : 0);
+}
+} // namespace detail
+
 VAPOR_NODISCARD inline bool operator==(const String &lhs,
                                        const String &rhs) noexcept {
-  if (lhs.size() != rhs.size())
-    return false;
-  return ::strcmp(lhs.c_str(), rhs.c_str()) == 0;
+  return detail::CompareBytes(lhs.data(), lhs.size(), rhs.data(),
+                              rhs.size()) == 0;
 }
 
 VAPOR_NODISCARD inline bool operator!=(const String &lhs,
@@ -272,7 +291,7 @@ VAPOR_NODISCARD inline bool operator!=(const String &lhs,
 
 VAPOR_NODISCARD inline bool operator<(const String &lhs,
                                       const String &rhs) noexcept {
-  return ::strcmp(lhs.c_str(), rhs.c_str()) < 0;
+  return detail::CompareBytes(lhs.data(), lhs.size(), rhs.data(), rhs.size()) < 0;
 }
 VAPOR_NODISCARD inline bool operator<=(const String &lhs,
                                        const String &rhs) noexcept {
@@ -289,9 +308,8 @@ VAPOR_NODISCARD inline bool operator>=(const String &lhs,
 
 VAPOR_NODISCARD inline bool operator==(const String &lhs,
                                        StringView rhs) noexcept {
-  if (lhs.size() != rhs.size())
-    return false;
-  return ::strncmp(lhs.data(), rhs.data(), rhs.size()) == 0;
+  return detail::CompareBytes(lhs.data(), lhs.size(), rhs.data(),
+                              rhs.size()) == 0;
 }
 
 VAPOR_NODISCARD inline bool operator==(StringView lhs,
@@ -309,20 +327,14 @@ VAPOR_NODISCARD inline bool operator!=(StringView lhs,
 
 VAPOR_NODISCARD inline bool operator<(const String &lhs,
                                       StringView rhs) noexcept {
-  size_t min_len = lhs.size() < rhs.size() ? lhs.size() : rhs.size();
-  int cmp = ::strncmp(lhs.data(), rhs.data(), min_len);
-  if (cmp != 0)
-    return cmp < 0;
-  return lhs.size() < rhs.size();
+  return detail::CompareBytes(lhs.data(), lhs.size(), rhs.data(),
+                              rhs.size()) < 0;
 }
 
 VAPOR_NODISCARD inline bool operator<(StringView lhs,
                                       const String &rhs) noexcept {
-  size_t min_len = lhs.size() < rhs.size() ? lhs.size() : rhs.size();
-  int cmp = ::strncmp(lhs.data(), rhs.data(), min_len);
-  if (cmp != 0)
-    return cmp < 0;
-  return lhs.size() < rhs.size();
+  return detail::CompareBytes(lhs.data(), lhs.size(), rhs.data(),
+                              rhs.size()) < 0;
 }
 VAPOR_NODISCARD inline bool operator<=(const String &lhs,
                                        StringView rhs) noexcept {
@@ -353,7 +365,7 @@ VAPOR_NODISCARD inline bool operator==(const String &lhs,
                                        const char *rhs) noexcept {
   if (!rhs)
     return false;
-  return ::strcmp(lhs.c_str(), rhs) == 0;
+  return detail::CompareBytes(lhs.data(), lhs.size(), rhs, ::strlen(rhs)) == 0;
 }
 
 VAPOR_NODISCARD inline bool operator==(const char *lhs,
@@ -373,14 +385,14 @@ VAPOR_NODISCARD inline bool operator<(const String &lhs,
                                       const char *rhs) noexcept {
   if (!rhs)
     return false;
-  return ::strcmp(lhs.c_str(), rhs) < 0;
+  return detail::CompareBytes(lhs.data(), lhs.size(), rhs, ::strlen(rhs)) < 0;
 }
 
 VAPOR_NODISCARD inline bool operator<(const char *lhs,
                                       const String &rhs) noexcept {
   if (!lhs)
     return true;
-  return ::strcmp(lhs, rhs.c_str()) < 0;
+  return detail::CompareBytes(lhs, ::strlen(lhs), rhs.data(), rhs.size()) < 0;
 }
 
 VAPOR_NODISCARD inline bool operator<=(const String &lhs,

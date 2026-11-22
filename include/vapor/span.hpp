@@ -1,6 +1,7 @@
 #pragma once
 #include <assert.h>
 #include <stddef.h>
+#include <stdlib.h>
 #include <vapor/common.hpp>
 #include <vapor/expected.hpp>
 #include <vapor/reference_wrapper.hpp>
@@ -49,6 +50,13 @@ public:
 
   template <size_type N>
   VAPOR_CXX14_CONSTEXPR Span(T (&arr)[N]) noexcept : m_data(arr), m_length(N) {}
+
+  // Implicit Span<T> -> Span<const T> (adding qualifiers only, never removing)
+  template <typename U,
+            typename = EnableIfT<!IsSame<U, T>::value &&
+                                 IsConvertible<U (*)[], T (*)[]>::value>>
+  VAPOR_CXX14_CONSTEXPR Span(const Span<U> &other) noexcept
+      : m_data(other.data()), m_length(other.size()) {}
 
   VAPOR_CXX14_CONSTEXPR Span(const Span &) noexcept = default;
   Span &operator=(const Span &) noexcept = default;
@@ -106,9 +114,7 @@ public:
 
   VAPOR_NODISCARD VAPOR_CXX14_CONSTEXPR reference at(size_type pos) const {
     if (pos >= m_length) {
-      // Emulating abort logic from your StringView
-      volatile int *p = nullptr;
-      (void)*p;
+      abort();
     }
     return m_data[pos];
   }
